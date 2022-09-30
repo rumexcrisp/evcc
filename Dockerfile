@@ -1,3 +1,5 @@
+ARG BUILDPLATFORM=amd64
+
 # STEP 1 build ui
 FROM --platform=$BUILDPLATFORM node:16-alpine as node
 

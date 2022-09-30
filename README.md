@@ -42,6 +42,16 @@ evcc is an extensible EV Charge Controller with PV integration implemented in [G
 
 You'll find everything you need in our [documentation](https://docs.evcc.io/) (German).
 
+## Build Docker Image
+
+Inside folder where `Dockerfile` is located run:
+
+```sh
+docker build --network host -t evcc-custom -f Dockerfile .
+```
+
+(Change ARG=amd64 in `Dockerfile` accordingly)
+
 ## Contribute
 
 To build evcc from source, [Go][2] 1.18 and [Node][3] 16 are required.

@@ -153,9 +153,10 @@ func unwrap(err error) (res []string) {
 
 func redact(src string) string {
 	secrets := []string{
-		"url", "uri", "host", "broker", // infrastructure
-		"user", "password", // users
-		"token", "access", "refresh", "sponsortoken", // tokens
+		"url", "uri", "host", "broker", "mac", // infrastructure
+		"sponsortoken", "plant", // global settings
+		"user", "password", "pin", // users
+		"token", "access", "refresh", // tokens
 		"ain", "id", "secret", "serial", "deviceid", "machineid", // devices
 		"vin"} // vehicles
 	return regexp.

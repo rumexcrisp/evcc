@@ -31,7 +31,7 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 13036 # Total Import Energy
+      address: 13036 # Total Import Energy, 0.1kWh
       type: input
       decode: uint32s
     scale: 0.1
@@ -48,7 +48,7 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 13002 # Total PV Generation
+      address: 13002 # Total PV Generation, 0.1kWh
       type: input
       decode: uint32s
     scale: 0.1
@@ -84,7 +84,7 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 13026 # Total battery discharge energy
+      address: 13026 # Total battery discharge energy, 0.1kWh
       type: input
       decode: uint32s
     scale: 0.1

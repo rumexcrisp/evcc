@@ -29,7 +29,7 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 5098 # Total import energy
+      address: 5098 # Total import energy, 0.1 kWh
       type: input
       decode: uint32s
     scale: 0.1
@@ -46,8 +46,7 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 5003 # Total power yields
+      address: 5003 # Total power yields, 1 kWh
       type: input
       decode: uint32s
-    scale: 0.1
   {{- end }}

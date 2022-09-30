@@ -129,3 +129,8 @@ image-update:
 soc:
 	@echo Version: $(VERSION) $(SHA) $(BUILD_DATE)
 	go build $(BUILD_TAGS) $(BUILD_ARGS) github.com/evcc-io/evcc/cmd/soc
+
+# patch asn1.go to allow Elli buggy certificates to be accepted with EEBUS
+patch-asn1:
+	cat $$(go env GOROOT)/src/vendor/golang.org/x/crypto/cryptobyte/asn1.go | grep -C 1 "out = true"
+	patch -N -t -d $$(go env GOROOT)/src/vendor/golang.org/x/crypto/cryptobyte -i $$(pwd)/patch/asn1.diff

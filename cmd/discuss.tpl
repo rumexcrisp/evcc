@@ -11,6 +11,7 @@ Fehlermeldung:
 
 {{ end -}}
 
+{{ if .CfgContent -}}
 <details><summary>Konfiguration{{ if .CfgFile }} ({{ .CfgFile }}){{ end }}</summary>
 
 ```yaml
@@ -18,6 +19,7 @@ Fehlermeldung:
 ```
 
 </details>
+{{ end -}}
 
 {{ if .Version -}}
 Version: `{{ .Version }}`

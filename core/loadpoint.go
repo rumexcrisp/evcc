@@ -12,6 +12,7 @@ import (
 
 	"github.com/evcc-io/evcc/api"
 	"github.com/evcc-io/evcc/core/coordinator"
+	"github.com/evcc-io/evcc/core/db"
 	"github.com/evcc-io/evcc/core/loadpoint"
 	"github.com/evcc-io/evcc/core/soc"
 	"github.com/evcc-io/evcc/core/wrapper"
@@ -113,6 +114,7 @@ type LoadPoint struct {
 	Enable, Disable   ThresholdConfig
 	ResetOnDisconnect bool `mapstructure:"resetOnDisconnect"`
 	onDisconnect      api.ActionConfig
+	targetEnergy      int // Target charge energy for dumb vehicles
 
 	MinCurrent    float64       // PV mode: start current	Min+PV mode: min current
 	MaxCurrent    float64       // Max allowed current. Physically ensured by the charger
@@ -157,6 +159,10 @@ type LoadPoint struct {
 	chargeRemainingEnergy   float64       // Remaining charge energy in Wh
 	progress                *Progress     // Step-wise progress indicator
 
+	// session log
+	db      db.Database
+	session *db.Session
+
 	tasks queues.Queue // tasks to be executed
 }
 
@@ -176,7 +182,7 @@ func NewLoadPointFromConfig(log *util.Logger, cp configProvider, other map[strin
 		if lp.SoC.Poll.Mode != "" {
 			lp.log.WARN.Printf("invalid poll mode: %s", lp.SoC.Poll.Mode)
 		}
-		lp.SoC.Poll.Mode = pollConnected
+		lp.SoC.Poll.Mode = pollCharging
 	}
 
 	// set vehicle polling interval
@@ -381,6 +387,8 @@ func (lp *LoadPoint) evChargeStartHandler() {
 
 	// soc update reset
 	lp.socUpdated = time.Time{}
+
+	lp.startSession()
 }
 
 // evChargeStopHandler sends external stop event
@@ -396,6 +404,8 @@ func (lp *LoadPoint) evChargeStopHandler() {
 	if !lp.pvTimer.Equal(elapsed) {
 		lp.resetPVTimerIfRunning()
 	}
+
+	lp.stopSession()
 }
 
 // evVehicleConnectHandler sends external start event
@@ -428,6 +438,10 @@ func (lp *LoadPoint) evVehicleConnectHandler() {
 // evVehicleDisconnectHandler sends external start event
 func (lp *LoadPoint) evVehicleDisconnectHandler() {
 	lp.log.INFO.Println("car disconnected")
+
+	// ensure session is persisted and closed before vehicle is changed
+	lp.stopSession()
+	lp.finalizeSession()
 
 	// phases are unknown when vehicle disconnects
 	lp.resetMeasuredPhases()
@@ -601,7 +615,7 @@ func (lp *LoadPoint) setLimit(chargeCurrent float64, force bool) error {
 	// set current
 	if chargeCurrent != lp.chargeCurrent && chargeCurrent >= lp.GetMinCurrent() {
 		var err error
-		if charger, ok := lp.charger.(api.ChargerEx); ok {
+		if charger, ok := lp.charger.(api.ChargerEx); ok && !lp.vehicleHasFeature(api.CoarseCurrent) {
 			err = charger.MaxCurrentMillis(chargeCurrent)
 		} else {
 			chargeCurrent = math.Trunc(chargeCurrent)
@@ -683,6 +697,13 @@ func (lp *LoadPoint) setStatus(status api.ChargeStatus) {
 	lp.status = status
 }
 
+// targetEnergyReached checks if target is configured and reached
+func (lp *LoadPoint) targetEnergyReached() bool {
+	return (lp.vehicle == nil || lp.vehicleHasFeature(api.Offline)) &&
+		lp.targetEnergy > 0 &&
+		lp.chargedEnergy/1e3 >= float64(lp.targetEnergy)
+}
+
 // targetSocReached checks if target is configured and reached.
 // If vehicle is not configured this will always return false
 func (lp *LoadPoint) targetSocReached() bool {
@@ -729,6 +750,17 @@ func (lp *LoadPoint) climateActive() bool {
 	}
 
 	return false
+}
+
+// disableUnlessClimater disables the charger unless climate is active
+func (lp *LoadPoint) disableUnlessClimater() error {
+	var current float64 // zero disables
+	if lp.climateActive() {
+		lp.log.DEBUG.Println("climater active")
+		current = lp.GetMinCurrent()
+	}
+	lp.socTimer.Reset() // once SoC is reached, the target charge request is removed
+	return lp.setLimit(current, true)
 }
 
 // remoteControlled returns true if remote control status is active
@@ -864,12 +896,16 @@ func (lp *LoadPoint) setActiveVehicle(vehicle api.Vehicle) {
 		lp.publish(vehicleOdometer, 0.0)
 	}
 
+	// reset target energy
+	lp.setTargetEnergy(0)
+
 	// re-publish vehicle settings
 	lp.Unlock()
 	lp.publish(phasesActive, lp.activePhases())
 	lp.Lock()
 
 	lp.unpublishVehicle()
+	lp.updateSession()
 }
 
 func (lp *LoadPoint) wakeUpVehicle() {
@@ -898,6 +934,22 @@ func (lp *LoadPoint) unpublishVehicle() {
 	lp.publish(vehicleTargetSoC, 0.0)
 
 	lp.setRemainingDuration(-1)
+
+	lp.vehiclePublishFeature(api.Offline)
+}
+
+// vehicleHasFeature checks availability of vehicle feature
+func (lp *LoadPoint) vehicleHasFeature(f api.Feature) bool {
+	v, ok := lp.vehicle.(api.FeatureDescriber)
+	if ok {
+		ok = v.Has(f)
+	}
+	return ok
+}
+
+// vehiclePublishFeature availability of vehicle features
+func (lp *LoadPoint) vehiclePublishFeature(f api.Feature) {
+	lp.publish("vehicleFeature"+f.String(), lp.vehicleHasFeature(f))
 }
 
 // vehicleUnidentified returns true if there are associated vehicles and detection is running.
@@ -1459,7 +1511,8 @@ func (lp *LoadPoint) socPollAllowed() bool {
 	remaining := lp.SoC.Poll.Interval - lp.clock.Since(lp.socUpdated)
 
 	honourUpdateInterval := lp.SoC.Poll.Mode == pollAlways ||
-		lp.SoC.Poll.Mode == pollConnected && lp.connected()
+		lp.SoC.Poll.Mode == pollConnected && lp.connected() ||
+		lp.SoC.Poll.Mode == pollCharging && lp.connected() && (lp.vehicleSoc < float64(lp.SoC.target))
 
 	if honourUpdateInterval && remaining > 0 {
 		lp.log.DEBUG.Printf("next soc poll remaining time: %v", remaining.Truncate(time.Second))
@@ -1632,15 +1685,13 @@ func (lp *LoadPoint) Update(sitePower float64, cheap, batteryBuffered bool) {
 			lp.log.DEBUG.Printf("switched phases: %dp", lp.ConfiguredPhases)
 		}
 
+	case lp.targetEnergyReached():
+		lp.log.DEBUG.Printf("targetEnergy reached: %.0fkWh > %dkWh", lp.chargedEnergy/1e3, lp.targetEnergy)
+		err = lp.disableUnlessClimater()
+
 	case lp.targetSocReached():
-		lp.log.DEBUG.Printf("targetSoC reached: %.1f > %d", lp.vehicleSoc, lp.SoC.target)
-		var targetCurrent float64 // zero disables
-		if lp.climateActive() {
-			lp.log.DEBUG.Println("climater active")
-			targetCurrent = lp.GetMinCurrent()
-		}
-		err = lp.setLimit(targetCurrent, true)
-		lp.socTimer.Reset() // once SoC is reached, the target charge request is removed
+		lp.log.DEBUG.Printf("targetSoC reached: %.1f%% > %d%%", lp.vehicleSoc, lp.SoC.target)
+		err = lp.disableUnlessClimater()
 
 	// OCPP has priority over target charging
 	case lp.remoteControlled(loadpoint.RemoteHardDisable):

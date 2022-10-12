@@ -49,6 +49,37 @@ func (lp *LoadPoint) SetMode(mode api.ChargeMode) {
 	}
 }
 
+// GetTargetSoC returns loadpoint charge target energy
+func (lp *LoadPoint) GetTargetEnergy() int {
+	lp.Lock()
+	defer lp.Unlock()
+	return lp.SoC.target
+}
+
+// setTargetEnergy sets loadpoint charge target energy (no mutex)
+func (lp *LoadPoint) setTargetEnergy(energy int) {
+	lp.targetEnergy = energy
+	// TODO soctimer
+	// if lp.socTimer != nil {
+	// lp.socTimer.Energy = energy
+	// }
+	lp.publish("targetEnergy", energy)
+}
+
+// SetTargetEnergy sets loadpoint charge target energy
+func (lp *LoadPoint) SetTargetEnergy(energy int) {
+	lp.Lock()
+	defer lp.Unlock()
+
+	lp.log.DEBUG.Println("set target energy:", energy)
+
+	// apply immediately
+	if lp.targetEnergy != energy {
+		lp.setTargetEnergy(energy)
+		lp.requestUpdate()
+	}
+}
+
 // GetTargetSoC returns loadpoint charge target soc
 func (lp *LoadPoint) GetTargetSoC() int {
 	lp.Lock()

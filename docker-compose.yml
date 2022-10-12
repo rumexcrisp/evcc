@@ -1,0 +1,24 @@
+version: "3"
+services:
+  evcc:
+    command:
+      - evcc
+    container_name: evcc
+    entrypoint:
+      - /app/entrypoint.sh
+    environment:
+      # - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - TZ=Europe/Berlin
+    # image: andig/evcc:latest
+    image: evcc-custom:latest
+    ipc: private
+    logging:
+      driver: json-file
+      options: {}
+    ports:
+      - 7070:7070/tcp
+    volumes:
+      - ./evcc.yaml:/etc/evcc.yaml
+    restart: unless-stopped
+    working_dir: /app
+networks: {}

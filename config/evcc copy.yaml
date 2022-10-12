@@ -1,0 +1,75 @@
+network:
+  # schema is the HTTP schema
+  # setting to `https` does not enable https, it only changes the way URLs are generated
+  schema: http
+  # host is the hostname or IP address
+  # if the host name contains a `.local` suffix, the name will be announced on MDNS
+  # docker: MDNS announcements don't work. host must be set to the docker host's name.
+  # host: evcc.local
+  # port is the listening port for UI and api
+  # evcc will listen on all available interfaces
+  port: 7070
+
+# log settings
+log: info
+levels:
+  site: debug
+  lp-1: debug
+  lp-2: debug
+
+# mqtt message broker
+mqtt:
+  broker: 192.168.10.33:1883
+  topic: evcc # root topic for publishing, set empty to disable publishing
+  clientid: evcc
+  user: evcc
+  password: AS!dfghJKL97@EVCC?
+
+# meter definitions
+# name can be freely chosen and is used as reference when assigning meters to site and loadpoints
+# for documentation see https://docs.evcc.io/docs/devices/meters
+meters:
+  - name: Iskra MT681
+    type: custom
+    power: # power (W)
+      source: mqtt
+      topic: tele/tasmota_9C5C90/SENSOR
+      jq: .MT681.Power_cur
+      timeout: 30s # don't accept values older than timeout
+      scale: 1 # floating point factor applied to result, e.g. for Wh to kWh conversion
+    energy: # optional energy (kWh)
+      source: mqtt
+      topic: tele/tasmota_9C5C90/SENSOR
+      jq: .MT681.Total_in
+      timeout: 30s # don't accept values older than timeout
+      scale: 1 # floating point factor applied to result, e.g. for Wh to kWh conversion
+    # soc: # optional battery soc (%)
+    #   source: # plugin type
+    #   # ...
+    # currents: # optional currents (A)
+    #   - source: mqtt # L1 plugin type
+    #     topic: tele/tasmota_9C5C90/SENSOR
+    #     jq: $.MT681.$.MT681.$.MT681.Power_p1
+    #     timeout: 30s # don't accept values older than timeout
+    #     scale: 1
+    #   - source: mqtt # L2 plugin type
+    #     topic: tele/tasmota_9C5C90/SENSOR
+    #     jq: $.MT681.$.MT681.$.MT681.Power_p2
+    #     timeout: 30s # don't accept values older than timeout
+    #     scale: 1
+    #   - source: mqtt # L3 plugin type
+    #     topic: tele/tasmota_9C5C90/SENSOR
+    #     jq: $.MT681.$.MT681.$.MT681.Power_p3
+    #     timeout: 30s # don't accept values older than timeout
+    #     scale: 1
+
+chargers:
+  - name: ABB Terra AC
+    type: template
+    template: abb      
+    
+    # Modbus TCP
+    modbus: tcpip
+    id: 1
+    host: 192.0.2.2 # Hostname
+    port: 502 # Port 

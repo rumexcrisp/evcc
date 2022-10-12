@@ -1,5 +1,3 @@
-//go:build !windows
-
 package cmd
 
 import (
@@ -10,7 +8,6 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/Masterminds/sprig/v3"
 	"github.com/evcc-io/evcc/server"
 	"github.com/evcc-io/evcc/util"
 	"github.com/pkg/browser"
@@ -18,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// discussCmd represents the meter command
+// discussCmd represents the discuss command
 var discussCmd = &cobra.Command{
 	Use:   "discuss",
 	Short: "Request support at Github Discussions (https://github.com/evcc-io/evcc/discussions/categories/erste-hilfe)",
@@ -45,6 +42,8 @@ func runDiscuss(cmd *cobra.Command, args []string) {
 
 	cfgErr := loadConfigFile(&conf)
 
+	setLogLevel(cmd)
+
 	file, pathErr := filepath.Abs(cfgFile)
 	if pathErr != nil {
 		file = cfgFile
@@ -55,9 +54,9 @@ func runDiscuss(cmd *cobra.Command, args []string) {
 		redacted = redact(string(src))
 	}
 
-	out := new(bytes.Buffer)
-	tmpl := template.Must(template.New("discuss").Funcs(sprig.FuncMap()).Parse(discussTmpl))
+	tmpl := template.Must(template.New("discuss").Parse(discussTmpl))
 
+	out := new(bytes.Buffer)
 	_ = tmpl.Execute(out, map[string]any{
 		"CfgFile":    file,
 		"CfgError":   errorString(cfgErr),
@@ -70,7 +69,7 @@ func runDiscuss(cmd *cobra.Command, args []string) {
 
 	if err := browser.OpenURL(uri); err != nil {
 		log.FATAL.Println("Could not open browser.")
-		log.FATAL.Println("Goto https://github.com/evcc-io/evcc/discussions/new?category=erste-hilfe and post the following:")
+		log.FATAL.Println("Go to https://github.com/evcc-io/evcc/discussions/new?category=erste-hilfe and post the following:")
 		log.FATAL.Println(body)
 	}
 }

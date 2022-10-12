@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -220,4 +221,15 @@ type AuthProvider interface {
 	SetCallbackParams(baseURL, redirectURL string, authenticated chan<- bool)
 	LoginHandler() http.HandlerFunc
 	LogoutHandler() http.HandlerFunc
+}
+
+// FeatureDescriber optionally provides a list of supported non-api features
+type FeatureDescriber interface {
+	Features() []Feature
+	Has(Feature) bool
+}
+
+// CsvWriter converts to csv
+type CsvWriter interface {
+	WriteCsv(io.Writer)
 }

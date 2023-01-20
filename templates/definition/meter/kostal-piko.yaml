@@ -6,7 +6,10 @@ products:
 params:
   - name: usage
     choice: ["grid", "pv", "battery"]
+    allinone: true
   - name: host
+  - name: capacity
+    advanced: true
 render: |
   type: custom
   power:
@@ -35,4 +38,7 @@ render: |
     uri: http://{{ .host }}/api/dxs.json?dxsEntries=33556229 # Battery SOC
     #   | ----------------------------- Bat SOC% --------- |
     jq: (.dxsEntries[] | select(.dxsId==33556229) | .value )
+  {{- if ne .capacity "" }}
+  capacity: {{ .capacity }} # kWh
+  {{- end }}
   {{- end -}}

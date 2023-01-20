@@ -12,9 +12,12 @@ requirements:
 params:
   - name: usage
     choice: ["grid", "pv", "battery"]
+    allinone: true
   - name: host
   - name: port
     default: 502
+  - name: capacity
+    advanced: true
 render: |
   type: custom
   {{- if eq .usage "pv" }}
@@ -77,7 +80,10 @@ render: |
     uri: {{ .host }}:{{ .port }} # Port 502
     id: 2
     register:
-      address: 30845 # Battery SoC, %
+      address: 30845 # Battery Soc, %
       type: holding
       decode: uint32nan
+  {{- if ne .capacity "" }}
+  capacity: {{ .capacity }} # kWh
+  {{- end }}
   {{- end }}

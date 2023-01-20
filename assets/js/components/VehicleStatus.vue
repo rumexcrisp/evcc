@@ -9,18 +9,19 @@ export default {
 	name: "VehicleStatus",
 	mixins: [formatter],
 	props: {
-		vehicleSoC: Number,
-		vehicleTargetSoC: Number,
-		minSoC: Number,
+		vehicleSoc: Number,
+		vehicleTargetSoc: Number,
+		minSoc: Number,
 		enabled: Boolean,
 		connected: Boolean,
 		charging: Boolean,
 		targetTime: String,
-		targetTimeProjectedStart: String,
+		planProjectedStart: String,
 		phaseAction: String,
 		phaseRemainingInterpolated: Number,
 		pvAction: String,
 		pvRemainingInterpolated: Number,
+		targetChargeDisabled: Boolean,
 	},
 	computed: {
 		phaseTimerActive() {
@@ -45,21 +46,21 @@ export default {
 			}
 
 			// min charge active
-			if (this.minSoC > 0 && this.vehicleSoC < this.minSoC) {
-				return t("minCharge", { soc: this.minSoC });
+			if (this.minSoc > 0 && this.vehicleSoc < this.minSoc) {
+				return t("minCharge", { soc: this.minSoc });
 			}
 
-			// target charage
-			if (this.targetTime) {
+			// target charge
+			if (this.targetTime && !this.targetChargeDisabled) {
 				if (this.charging) {
 					return t("targetChargeActive");
 				}
 				if (this.enabled) {
 					return t("targetChargeWaitForVehicle");
 				}
-				if (this.targetTimeProjectedStart) {
+				if (this.planProjectedStart) {
 					return t("targetChargePlanned", {
-						time: this.fmtAbsoluteDate(new Date(this.targetTimeProjectedStart)),
+						time: this.fmtAbsoluteDate(new Date(this.planProjectedStart)),
 					});
 				}
 			}
@@ -71,8 +72,8 @@ export default {
 			}
 
 			if (this.enabled && !this.charging) {
-				if (this.vehicleTargetSoC > 0 && this.vehicleSoC >= this.vehicleTargetSoC - 1) {
-					return t("vehicleTargetReached", { soc: this.vehicleTargetSoC });
+				if (this.vehicleTargetSoc > 0 && this.vehicleSoc >= this.vehicleTargetSoc - 1) {
+					return t("vehicleTargetReached", { soc: this.vehicleTargetSoc });
 				}
 				return t("waitForVehicle");
 			}

@@ -17,8 +17,10 @@ export default {
       val = Math.abs(val);
       return val >= this.fmtLimit ? this.round(val / 1e3, this.fmtDigits) : this.round(val, 0);
     },
-    fmtKw: function (watt = 0, kw = true, withUnit = true) {
-      const digits = kw ? 1 : 0;
+    fmtKw: function (watt = 0, kw = true, withUnit = true, digits) {
+      if (digits === undefined) {
+        digits = kw ? 1 : 0;
+      }
       const value = kw ? watt / 1000 : watt;
       let unit = "";
       if (withUnit) {
@@ -30,8 +32,15 @@ export default {
         maximumFractionDigits: digits,
       }).format(value)}${unit}`;
     },
-    fmtKWh: function (val) {
-      return this.fmtKw(val) + "h";
+    fmtKWh: function (watt, kw, withUnit, digits) {
+      return this.fmtKw(watt, kw, withUnit, digits) + "h";
+    },
+    fmtNumber: function (number, decimals) {
+      return new Intl.NumberFormat(this.$i18n.locale, {
+        style: "decimal",
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(number);
     },
     fmtUnit: function (val) {
       return Math.abs(val) >= this.fmtLimit ? "k" : "";
@@ -52,6 +61,7 @@ export default {
       if (duration <= 0) {
         return "—";
       }
+      duration = Math.round(duration);
       var seconds = duration % 60;
       var minutes = Math.floor(duration / 60) % 60;
       var hours = Math.floor(duration / 3600);
@@ -115,6 +125,13 @@ export default {
         weekday: "short",
       }).format(date);
     },
+    weekdayTime: function (date) {
+      return new Intl.DateTimeFormat(this.$i18n.locale, {
+        weekday: "short",
+        hour: "numeric",
+        minute: "numeric",
+      }).format(date);
+    },
     fmtAbsoluteDate: function (date) {
       const weekday = this.weekdayPrefix(date);
       const hour = new Intl.DateTimeFormat(this.$i18n.locale, {
@@ -135,6 +152,13 @@ export default {
     },
     fmtMonthYear: function (date) {
       return new Intl.DateTimeFormat(this.$i18n.locale, {
+        month: "long",
+        year: "numeric",
+      }).format(date);
+    },
+    fmtDayMonthYear: function (date) {
+      return new Intl.DateTimeFormat(this.$i18n.locale, {
+        day: "numeric",
         month: "long",
         year: "numeric",
       }).format(date);

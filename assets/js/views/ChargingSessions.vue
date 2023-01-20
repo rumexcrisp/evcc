@@ -15,145 +15,151 @@
 				<div class="mb-4">
 					<a
 						class="btn btn-outline-secondary text-nowrap my-2"
-						href="./api/sessions?format=csv"
+						:href="`./api/sessions?format=csv&amp;lang=${$i18n.locale}`"
 						download="sessions.csv"
 					>
 						{{ $t("sessions.downloadCsv") }}
 					</a>
 				</div>
 
-				<div v-for="group in sessionsByMonth" :key="group.month" class="mb-5">
+				<div v-for="group in sessionsByMonthAndLoadpoint" :key="group.month">
 					<div class="mx-2">
-						<div class="d-flex align-items-baseline mb-3">
+						<div class="d-flex align-items-baseline my-5">
 							<h2 class="me-4 mb-0">
 								{{ formatGroupHeadline(group.month) }}
 							</h2>
-							<div class="large">{{ fmtKWh(totalKWh(group.sessions)) }}</div>
 						</div>
-						<ul
-							v-for="by in ['loadpoint', 'vehicle']"
-							:key="by"
-							class="breakdown text-gray d-sm-flex flex-sm-wrap ps-0 mb-2"
-						>
-							<li
-								v-for="(loadpoint, id) in groupedKWh(by, group.sessions)"
-								:key="id"
-								class="breakdown-item"
-							>
-								{{ loadpoint.name }}: {{ fmtKWh(loadpoint.energy) }}
-							</li>
-						</ul>
-					</div>
-					<div class="table-responsive mt-3">
-						<table class="table">
-							<thead>
-								<tr>
-									<th scope="col" class="d-table-cell d-sm-none">
-										{{ $t("sessions.loadpoint") }}
-										<span class="text-nowrap">
-											→ {{ $t("sessions.vehicle") }}
-										</span>
-									</th>
-									<th scope="col" class="d-none d-sm-table-cell">
-										{{ $t("sessions.loadpoint") }}
-									</th>
-									<th scope="col" class="d-none d-sm-table-cell">
-										{{ $t("sessions.vehicle") }}
-									</th>
-									<th scope="col">{{ $t("sessions.energy") }}</th>
-									<th scope="col">{{ $t("sessions.date") }}</th>
-								</tr>
-							</thead>
-							<tbody>
-								<tr v-for="(session, id) in group.sessions" :key="id">
-									<td class="d-table-cell d-sm-none">
-										<span
-											v-if="
-												session.loadpointDisplay || session.vehicleDisplay
-											"
+
+						<div v-for="loadpoint in group.loadpoints" :key="loadpoint.name">
+							<div class="d-flex align-items-baseline mb-3">
+								<h3 class="me-4 mb-0">
+									{{ loadpoint.name }}
+								</h3>
+								<div class="large">{{ fmtKWh(loadpoint.total) }}</div>
+							</div>
+
+							<ul class="breakdown text-gray d-sm-flex flex-sm-wrap ps-0 mb-2">
+								<li
+									v-for="(vehicle, id) in groupedKWh(
+										'vehicle',
+										loadpoint.sessions
+									)"
+									:key="id"
+									class="breakdown-item"
+								>
+									{{ vehicle.name }}: {{ fmtKWh(vehicle.energy) }}
+								</li>
+							</ul>
+							<div class="table-responsive my-3">
+								<table class="table">
+									<thead>
+										<tr>
+											<th scope="col">{{ $t("sessions.vehicle") }}</th>
+											<th scope="col" class="text-end ps-sm-4 pe-md-5">
+												{{ $t("sessions.energy") }}
+											</th>
+											<th scope="col" class="ps-3 ps-md-4 ps-md-5">
+												{{ $t("sessions.date") }}
+											</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr
+											v-for="(session, id) in loadpoint.sessions"
+											:key="id"
+											role="button"
+											@click="showDetails(session)"
 										>
-											<span>
-												{{ session.loadpointDisplay }}
-											</span>
-											<span class="text-nowrap">
-												→ {{ session.vehicleDisplay }}
-											</span>
-										</span>
-									</td>
-									<td class="text-nowrap d-none d-sm-table-cell">
-										{{ session.loadpointDisplay }}
-									</td>
-									<td class="text-nowrap d-none d-sm-table-cell">
-										{{ session.vehicleDisplay }}
-									</td>
-									<td class="text-nowrap">
-										{{ fmtKWh(session.chargedEnergy * 1e3) }}
-									</td>
-									<td class="text-nowrap">
-										<span class="d-block d-sm-none">
-											{{ fmtFullDateTime(new Date(session.finished), true) }}
-										</span>
-										<span class="d-none d-sm-block">
-											{{ fmtFullDateTime(new Date(session.finished), false) }}
-										</span>
-									</td>
-								</tr>
-							</tbody>
-						</table>
+											<td class="align-middle">
+												{{ session.vehicle }}
+											</td>
+											<td
+												class="text-nowrap text-end ps-sm-4 pe-md-5 align-middle"
+											>
+												{{ fmtKWh(session.chargedEnergy * 1e3) }}
+											</td>
+											<td class="text-nowrap ps-3 ps-md-4 ps-md-5">
+												<span class="d-block d-sm-none">
+													{{
+														fmtFullDateTime(
+															new Date(session.created),
+															true
+														)
+													}}
+													<br />
+													{{
+														fmtFullDateTime(
+															new Date(session.finished),
+															true
+														)
+													}}
+												</span>
+												<span class="d-none d-sm-block">
+													{{
+														fmtFullDateTime(
+															new Date(session.created),
+															false
+														)
+													}}
+													<br />
+													{{
+														fmtFullDateTime(
+															new Date(session.finished),
+															false
+														)
+													}}
+												</span>
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
 					</div>
 				</div>
 			</main>
+			<ChargingSessionModal :session="selectedSession" @session-deleted="loadSessions" />
 		</div>
 	</div>
 </template>
 
 <script>
+import Modal from "bootstrap/js/dist/modal";
 import TopNavigation from "../components/TopNavigation.vue";
 import "@h2d2/shopicons/es/bold/arrowback";
+import "@h2d2/shopicons/es/regular/trash";
 import formatter from "../mixins/formatter";
 import api from "../api";
+import ChargingSessionModal from "../components/ChargingSessionModal.vue";
 
 export default {
 	name: "ChargingSessions",
-	components: { TopNavigation },
+	components: { TopNavigation, ChargingSessionModal },
 	mixins: [formatter],
 	props: {
 		notifications: Array,
 	},
 	data() {
-		return { sessions: [] };
+		return { sessions: [], selectedSession: undefined };
 	},
 	computed: {
-		sessionsByMonth() {
-			const grouped = this.sessions.reduce((groups, session) => {
-				const date = new Date(session.finished);
-				const month = `${date.getFullYear()}.${date.getMonth()}`;
-				if (!groups[month]) groups[month] = [];
-				groups[month].push(session);
-				return groups;
-			}, {});
-			return Object.entries(grouped).map(([month, sessions]) => {
-				let lastLoadpoint = "";
-				let lastVehicle = "";
-				const cleanedSession = sessions.map((session) => {
-					const result = { ...session };
-					if (!result.vehicle) {
-						result.vehicle = this.$t("main.vehicle.unknown");
-					}
-					if (!result.loadpoint) {
-						result.loadpoint = this.$t("main.loadpoint.fallbackName");
-					}
+		sessionsByMonthAndLoadpoint() {
+			const sessionsWithDefaults = this.sessions.map((session) => {
+				const loadpoint = session.loadpoint || this.$t("main.loadpoint.fallbackName");
+				const vehicle = session.vehicle || this.$t("main.vehicle.unknown");
+				return { ...session, loadpoint, vehicle };
+			});
 
-					const identical =
-						lastLoadpoint === result.loadpoint && lastVehicle === result.vehicle;
-					result.loadpointDisplay = identical ? null : result.loadpoint;
-					result.vehicleDisplay = identical ? null : result.vehicle;
+			const sessionsByMonth = this.groupByMonth(sessionsWithDefaults);
 
-					lastLoadpoint = result.loadpoint;
-					lastVehicle = result.vehicle;
-					return result;
-				});
-				return { month, sessions: cleanedSession };
+			return Object.entries(sessionsByMonth).map(([month, sessions]) => {
+				const loadpoints = Object.entries(this.groupByLoadpoint(sessions)).map(
+					([loadpoint, sessionsByLoadpoint]) => {
+						const total = this.totalKWh(sessionsByLoadpoint);
+						return { name: loadpoint, total, sessions: sessionsByLoadpoint };
+					}
+				);
+				return { month, loadpoints };
 			});
 		},
 	},
@@ -164,6 +170,23 @@ export default {
 		async loadSessions() {
 			const response = await api.get("sessions");
 			this.sessions = response.data?.result;
+		},
+		groupByMonth(sessions) {
+			return sessions.reduce((groups, session) => {
+				const date = new Date(session.finished);
+				const month = `${date.getFullYear()}.${date.getMonth()}`;
+				if (!groups[month]) groups[month] = [];
+				groups[month].push(session);
+				return groups;
+			}, {});
+		},
+		groupByLoadpoint(sessions) {
+			return sessions.reduce((groups, session) => {
+				const loadpoint = session.loadpoint;
+				if (!groups[loadpoint]) groups[loadpoint] = [];
+				groups[loadpoint].push(session);
+				return groups;
+			}, {});
 		},
 		totalKWh(sessions) {
 			return sessions.reduce((total, session) => total + session.chargedEnergy, 0) * 1e3;
@@ -187,6 +210,11 @@ export default {
 			date.setFullYear(year);
 			return this.fmtMonthYear(date);
 		},
+		showDetails(session) {
+			this.selectedSession = session;
+			const modal = Modal.getOrCreateInstance(document.getElementById("sessionDetailsModal"));
+			modal.show();
+		},
 	},
 };
 </script>
@@ -205,7 +233,8 @@ export default {
 	white-space: nowrap;
 }
 
-@media (--sm-and-up) {
+/* breakpoint sm */
+@media (min-width: 576px) {
 	.breakdown-item:after {
 		content: ", ";
 		white-space: wrap;
@@ -218,12 +247,5 @@ export default {
 
 .breakdown:empty {
 	display: none;
-}
-.table td {
-	border-top-width: 1px;
-	border-bottom-width: 0;
-}
-.table td:empty {
-	border-top-width: 0;
 }
 </style>

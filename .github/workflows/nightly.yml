@@ -20,7 +20,7 @@ jobs:
         continue-on-error: true
         name: check latest commit is less than a day
         if: ${{ github.event_name == 'schedule' }}
-        run: test -z $(git rev-list  --after="24 hours"  ${{ github.sha }}) && echo "::set-output name=should_run::false"
+        run: test -z $(git rev-list  --after="24 hours" ${{ github.sha }}) && echo "should_run=false" >> $GITHUB_OUTPUT
 
   call-build-workflow:
     name: Call Build
@@ -60,6 +60,7 @@ jobs:
           push: true
           tags: |
             andig/evcc:nightly
+            evcc/evcc:nightly
 
   apt:
     name: Publish APT nightly
@@ -85,7 +86,7 @@ jobs:
         run: make patch-asn1-sudo
 
       - name: Create nightly build
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
           args: --snapshot -f .goreleaser-nightly.yml --rm-dist

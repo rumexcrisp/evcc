@@ -32,13 +32,15 @@ ARG RELEASE=0
 
 WORKDIR /build
 
-# install go tools and cache modules
-COPY Makefile .
+# download modules
 COPY go.mod .
 COPY go.sum .
+RUN go mod download
+
+# install tools
+COPY Makefile .
 COPY tools.go .
 RUN make install
-RUN go mod download
 
 # prepare
 COPY . .
@@ -77,6 +79,8 @@ COPY --from=builder /build/evcc /usr/local/bin/evcc
 
 COPY docker/bin/* /app/
 
+# mDNS
+EXPOSE 5353/udp
 # UI and /api
 EXPOSE 7070/tcp
 # KEBA charger

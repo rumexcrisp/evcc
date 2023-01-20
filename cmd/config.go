@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -16,13 +19,15 @@ import (
 	"github.com/evcc-io/evcc/provider/mqtt"
 	"github.com/evcc-io/evcc/push"
 	"github.com/evcc-io/evcc/server"
-	autoauth "github.com/evcc-io/evcc/server/auth"
+	"github.com/evcc-io/evcc/server/oauth2redirect"
 	"github.com/evcc-io/evcc/util"
+	"github.com/evcc-io/evcc/util/modbus"
 	"github.com/evcc-io/evcc/vehicle"
 	"github.com/evcc-io/evcc/vehicle/wrapper"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"golang.org/x/exp/maps"
+	"golang.org/x/sync/errgroup"
 )
 
 var conf = config{
@@ -47,15 +52,16 @@ type config struct {
 	Network      networkConfig
 	Log          string
 	SponsorToken string
-	Telemetry    bool
 	Plant        string // telemetry plant id
+	Telemetry    bool
 	Metrics      bool
 	Profile      bool
 	Levels       map[string]string
 	Interval     time.Duration
-	Mqtt         mqttConfig
 	Database     dbConfig
-	Javascript   map[string]interface{}
+	Mqtt         mqttConfig
+	ModbusProxy  []proxyConfig
+	Javascript   []javascriptConfig
 	Influx       server.InfluxConfig
 	EEBus        map[string]interface{}
 	HEMS         typedConfig
@@ -65,12 +71,23 @@ type config struct {
 	Vehicles     []qualifiedConfig
 	Tariffs      tariffConfig
 	Site         map[string]interface{}
-	LoadPoints   []map[string]interface{}
+	Loadpoints   []map[string]interface{}
 }
 
 type mqttConfig struct {
 	mqtt.Config `mapstructure:",squash"`
 	Topic       string
+}
+
+type javascriptConfig struct {
+	VM     string
+	Script string
+}
+
+type proxyConfig struct {
+	Port            int
+	ReadOnly        bool
+	modbus.Settings `mapstructure:",squash"`
 }
 
 type dbConfig struct {
@@ -97,6 +114,7 @@ type tariffConfig struct {
 	Currency string
 	Grid     typedConfig
 	FeedIn   typedConfig
+	Planner  typedConfig
 }
 
 type networkConfig struct {
@@ -196,64 +214,82 @@ func (cp *ConfigProvider) configureMeters(conf config) error {
 }
 
 func (cp *ConfigProvider) configureChargers(conf config) error {
+	var mu sync.Mutex
+	g, _ := errgroup.WithContext(context.Background())
+
 	cp.chargers = make(map[string]api.Charger)
 	for id, cc := range conf.Chargers {
 		if cc.Name == "" {
 			return fmt.Errorf("cannot create %s charger: missing name", humanize.Ordinal(id+1))
 		}
 
-		c, err := charger.NewFromConfig(cc.Type, cc.Other)
-		if err != nil {
-			err = fmt.Errorf("cannot create charger '%s': %w", cc.Name, err)
-			return err
-		}
+		cc := cc
 
-		if _, exists := cp.chargers[cc.Name]; exists {
-			return fmt.Errorf("duplicate charger name: %s already defined and must be unique", cc.Name)
-		}
+		g.Go(func() error {
+			c, err := charger.NewFromConfig(cc.Type, cc.Other)
+			if err != nil {
+				return fmt.Errorf("cannot create charger '%s': %w", cc.Name, err)
+			}
 
-		cp.chargers[cc.Name] = c
+			mu.Lock()
+			defer mu.Unlock()
+
+			if _, exists := cp.chargers[cc.Name]; exists {
+				return fmt.Errorf("duplicate charger name: %s already defined and must be unique", cc.Name)
+			}
+
+			cp.chargers[cc.Name] = c
+			return nil
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 func (cp *ConfigProvider) configureVehicles(conf config) error {
+	var mu sync.Mutex
+	g, _ := errgroup.WithContext(context.Background())
+
 	cp.vehicles = make(map[string]api.Vehicle)
 	for id, cc := range conf.Vehicles {
 		if cc.Name == "" {
 			return fmt.Errorf("cannot create %s vehicle: missing name", humanize.Ordinal(id+1))
 		}
 
-		// ensure vehicle config has title
-		var ccWithTitle struct {
-			Title string
-			Other map[string]interface{} `mapstructure:",remain"`
-		}
+		cc := cc
 
-		if err := util.DecodeOther(cc.Other, &ccWithTitle); err != nil {
-			return err
-		}
+		g.Go(func() error {
+			v, err := vehicle.NewFromConfig(cc.Type, cc.Other)
+			if err != nil {
+				var ce *util.ConfigError
+				if errors.As(err, &ce) {
+					return fmt.Errorf("cannot create vehicle '%s': %w", cc.Name, err)
+				}
 
-		if ccWithTitle.Title == "" {
-			//lint:ignore SA1019 as Title is safe on ascii
-			cc.Other["title"] = strings.Title(cc.Name)
-		}
+				// wrap non-config vehicle errors to prevent fatals
+				log.ERROR.Printf("creating vehicle %s failed: %v", cc.Name, err)
+				v = wrapper.New(err)
+			}
 
-		v, err := vehicle.NewFromConfig(cc.Type, cc.Other)
-		if err != nil {
-			// wrap any created errors to prevent fatals
-			v, _ = wrapper.New(v, err)
-		}
+			// ensure vehicle config has title
+			if v.Title() == "" {
+				//lint:ignore SA1019 as Title is safe on ascii
+				v.SetTitle(strings.Title(cc.Name))
+			}
 
-		if _, exists := cp.vehicles[cc.Name]; exists {
-			return fmt.Errorf("duplicate vehicle name: %s already defined and must be unique", cc.Name)
-		}
+			mu.Lock()
+			defer mu.Unlock()
 
-		cp.vehicles[cc.Name] = v
+			if _, exists := cp.vehicles[cc.Name]; exists {
+				return fmt.Errorf("duplicate vehicle name: %s already defined and must be unique", cc.Name)
+			}
+
+			cp.vehicles[cc.Name] = v
+			return nil
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 // webControl handles routing for devices. For now only api.AuthProvider related routes
@@ -265,7 +301,7 @@ func (cp *ConfigProvider) webControl(conf networkConfig, router *mux.Router, par
 	))
 
 	// wire the handler
-	autoauth.Setup(auth)
+	oauth2redirect.SetupRouter(auth)
 
 	// initialize
 	cp.auth = util.NewAuthCollection(paramC)

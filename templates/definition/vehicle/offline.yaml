@@ -5,8 +5,10 @@ products:
 group: generic
 params:
   - name: title
+  - name: icon
+    default: car
+    advanced: true
   - name: capacity
-    valuetype: float
   - name: phases
     advanced: true
   - name: mode
@@ -24,19 +26,22 @@ render: |
   {{- if ne .title "" }}
   title: {{ .title }}
   {{- end }}
+  {{- if ne .icon "" }}
+  icon: {{ .icon }}
+  {{- end }}
   capacity: {{ .capacity }} # kWh
   {{- if ne .phases "" }}
   phases: {{ .phases }}
   {{- end }}
-  soc: # fixed - no SoC available
+  soc: # fixed - no Soc available
     source: js
     script: 0;
   onIdentify:
   {{- if (ne .mode "") }}
     mode: {{ .mode }}
   {{- end }}
-    minSoC: 0 # fixed - no SoC available
-    targetSoC: 100 # fixed - no SoC available
+    minSoc: 0 # fixed - no Soc available
+    targetSoc: 100 # fixed - no Soc available
   {{- if (ne .minCurrent "") }}
     minCurrent: {{ .minCurrent }}
   {{- end }}

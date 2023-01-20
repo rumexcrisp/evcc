@@ -60,9 +60,9 @@ export default {
 		pvPower: Number,
 		batteryConfigured: Boolean,
 		batteryPower: Number,
-		batterySoC: Number,
+		batterySoc: Number,
 		gridCurrents: Array,
-		prioritySoC: Number,
+		prioritySoc: Number,
 		siteTitle: String,
 		vehicles: Array,
 
@@ -91,8 +91,17 @@ export default {
 		energyflow: function () {
 			return this.collectProps(Energyflow);
 		},
+		activeLoadpoints: function () {
+			return this.loadpoints.filter((lp) => lp.chargePower > 0);
+		},
 		activeLoadpointsCount: function () {
-			return this.loadpoints.filter((lp) => lp.chargePower > 0).length;
+			return this.activeLoadpoints.length;
+		},
+		vehicleIcons: function () {
+			if (this.activeLoadpointsCount) {
+				return this.activeLoadpoints.map((lp) => lp.vehicleIcon || "car");
+			}
+			return ["car"];
 		},
 		loadpointsPower: function () {
 			return this.loadpoints.reduce((sum, lp) => {
@@ -102,7 +111,7 @@ export default {
 		},
 		topNavigation: function () {
 			const vehicleLogins = this.auth ? this.auth.vehicles : {};
-			return { vehicleLogins };
+			return { vehicleLogins, ...this.collectProps(TopNavigation) };
 		},
 		showParkingLot: function () {
 			// work in progess

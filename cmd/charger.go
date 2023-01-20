@@ -6,10 +6,7 @@ import (
 	"strings"
 
 	"github.com/evcc-io/evcc/api"
-	"github.com/evcc-io/evcc/server"
-	"github.com/evcc-io/evcc/util"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // chargerCmd represents the charger command
@@ -29,20 +26,17 @@ func init() {
 	chargerCmd.Flags().BoolP(flagEnable, "e", false, strings.Title(flagEnable))
 	//lint:ignore SA1019 as Title is safe on ascii
 	chargerCmd.Flags().BoolP(flagDisable, "d", false, strings.Title(flagDisable))
+	//lint:ignore SA1019 as Title is safe on ascii
+	chargerCmd.Flags().Bool(flagDiagnose, false, strings.Title(flagDiagnose))
 	chargerCmd.Flags().BoolP(flagWakeup, "w", false, flagWakeupDescription)
 	chargerCmd.Flags().IntP(flagPhases, "p", 0, flagPhasesDescription)
 }
 
 func runCharger(cmd *cobra.Command, args []string) {
-	util.LogLevel(viper.GetString("log"), viper.GetStringMapString("levels"))
-	log.INFO.Printf("evcc %s", server.FormattedVersion())
-
 	// load config
 	if err := loadConfigFile(&conf); err != nil {
 		log.FATAL.Fatal(err)
 	}
-
-	setLogLevel(cmd)
 
 	// setup environment
 	if err := configureEnvironment(cmd, conf); err != nil {
@@ -139,8 +133,13 @@ func runCharger(cmd *cobra.Command, args []string) {
 
 	if !flagUsed {
 		d := dumper{len: len(chargers)}
+		flag := cmd.Flags().Lookup(flagDiagnose).Changed
+
 		for name, v := range chargers {
 			d.DumpWithHeader(name, v)
+			if flag {
+				d.DumpDiagnosis(v)
+			}
 		}
 	}
 

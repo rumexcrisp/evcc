@@ -8,6 +8,7 @@ group: generic
 params:
   - name: usage
     choice: ["grid", "pv", "battery"]
+    allinone: true
   - name: modbus
     choice: ["tcpip"]
   - name: integer
@@ -19,6 +20,8 @@ params:
       en: Verify Float/Integer setting in inverter
     advanced: true
     valuetype: bool
+  - name: capacity
+    advanced: true
 render: |
   {{- if eq .usage "grid" }}
   type: modbus
@@ -26,17 +29,35 @@ render: |
   {{- if eq .integer "true" }}
   # sunspec model 203 (int+sf) meter
   power: 203:W
+  energy: 203:TotWhImp
   currents:
     - 203:AphA
     - 203:AphB
     - 203:AphC
+  voltages:
+    - 203:PhVphA
+    - 203:PhVphB
+    - 203:PhVphC
+  powers:
+    - 203:WphA
+    - 203:WphB
+    - 203:WphC
   {{ else }}
   # sunspec model 213 (float) meter
   power: 213:W
+  energy: 213:TotWhImp
   currents:
     - 213:AphA
     - 213:AphB
     - 213:AphC
+  voltages:
+    - 213:PhVphA
+    - 213:PhVphB
+    - 213:PhVphC
+  powers:
+    - 213:WphA
+    - 213:WphB
+    - 213:WphC
   {{- end }}
   {{- end }}
   {{- if eq .usage "pv" }}
@@ -72,4 +93,7 @@ render: |
     {{- include "modbus" . | indent 2 }}
     model: sunspec
     value: ChargeState
+  {{- if ne .capacity "" }}
+  capacity: {{ .capacity }} # kWh
+  {{- end }}
   {{- end }}

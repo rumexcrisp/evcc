@@ -16,16 +16,12 @@
 					class="text-decoration-underline"
 					:class="{ 'text-gray fw-normal': !targetEnergy }"
 				>
-					<AnimatedNumber
-						:to="targetEnergy"
-						:format="formatKWh"
-						:no-animation="!targetEnergy"
-					/>
+					<AnimatedNumber :to="targetEnergy" :format="fmtEnergy" />
 				</span>
 			</label>
 
-			<div v-if="estimatedTargetSoC" class="extraValue ms-0 ms-sm-1 text-nowrap">
-				<AnimatedNumber :to="estimatedTargetSoC" :format="formatSoC" />
+			<div v-if="estimatedTargetSoc" class="extraValue ms-0 ms-sm-1 text-nowrap">
+				<AnimatedNumber :to="estimatedTargetSoc" :format="fmtSoc" />
 			</div>
 		</h3>
 	</LabelAndValue>
@@ -52,48 +48,51 @@ export default {
 			return this.vehicleCapacity || 100;
 		},
 		steps: function () {
-			if (this.maxEnergy < 25) {
-				return 1;
-			}
-			if (this.maxEnergy < 50) {
-				return 2;
-			}
+			if (this.maxEnergy < 1) return 0.05;
+			if (this.maxEnergy < 2) return 0.1;
+			if (this.maxEnergy < 5) return 0.25;
+			if (this.maxEnergy < 10) return 0.5;
+			if (this.maxEnergy < 25) return 1;
+			if (this.maxEnergy < 50) return 2;
 			return 5;
 		},
 		options: function () {
 			const result = [];
 			for (let energy = 0; energy <= this.maxEnergy; energy += this.steps) {
-				let text = this.formatKWh(energy);
+				let text = this.fmtEnergy(energy);
 				const disabled = energy < this.chargedEnergy / 1e3 && energy !== 0;
-				const soc = this.estimatedSoC(energy);
+				const soc = this.estimatedSoc(energy);
 				if (soc) {
-					text += ` (${this.formatSoC(soc)})`;
+					text += ` (${this.fmtSoc(soc)})`;
 				}
 				result.push({ energy, text, disabled });
 			}
 			return result;
 		},
-		estimatedTargetSoC: function () {
-			return this.estimatedSoC(this.targetEnergy);
+		estimatedTargetSoc: function () {
+			return this.estimatedSoc(this.targetEnergy);
 		},
 	},
 	methods: {
 		change: function (e) {
-			return this.$emit("target-energy-updated", parseInt(e.target.value, 10));
+			return this.$emit("target-energy-updated", parseFloat(e.target.value));
 		},
-		estimatedSoC: function (kWh) {
+		estimatedSoc: function (kWh) {
 			if (this.socPerKwh) {
 				return Math.round(kWh * this.socPerKwh);
 			}
 			return null;
 		},
-		formatKWh: function (value) {
+		fmtEnergy: function (value) {
 			if (value === 0) {
 				return this.$t("main.targetEnergy.noLimit");
 			}
-			return `${Math.round(value)} kWh`;
+
+			const inKWh = this.steps >= 0.1;
+			const digits = inKWh && this.steps < 1 ? 1 : 0;
+			return this.fmtKWh(value * 1e3, inKWh, true, digits);
 		},
-		formatSoC: function (value) {
+		fmtSoc: function (value) {
 			return `+${Math.round(value)}%`;
 		},
 	},

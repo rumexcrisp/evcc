@@ -11,9 +11,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/evcc-io/evcc/core"
 	"github.com/evcc-io/evcc/server"
-	"github.com/evcc-io/evcc/util"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // dumpCmd represents the meter command
@@ -44,13 +42,8 @@ func handle(device any, err error) any {
 }
 
 func runDump(cmd *cobra.Command, args []string) {
-	util.LogLevel(viper.GetString("log"), viper.GetStringMapString("levels"))
-	log.INFO.Printf("evcc %s", server.FormattedVersion())
-
 	// load config
 	err := loadConfigFile(&conf)
-
-	setLogLevel(cmd)
 
 	// setup environment
 	if err == nil {
@@ -132,8 +125,8 @@ func runDump(cmd *cobra.Command, args []string) {
 		d.DumpWithHeader(fmt.Sprintf("vehicle: %s", v.Title()), v)
 	}
 
-	for id, lpI := range site.LoadPoints() {
-		lp := lpI.(*core.LoadPoint)
+	for id, lpI := range site.Loadpoints() {
+		lp := lpI.(*core.Loadpoint)
 
 		d.Header(fmt.Sprintf("loadpoint %d", id+1), "=")
 		fmt.Println("")

@@ -3,6 +3,7 @@ package ocpp
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +27,9 @@ const (
 	KeyChargingScheduleMaxPeriods              = "ChargingScheduleMaxPeriods"
 	KeyConnectorSwitch3to1PhaseSupported       = "ConnectorSwitch3to1PhaseSupported"
 	KeyMaxChargingProfilesInstalled            = "MaxChargingProfilesInstalled"
+
+	// Alfen specific keys
+	KeyAlfenPlugAndChargeIdentifier = "PlugAndChargeIdentifier"
 )
 
 type CP struct {
@@ -112,20 +116,18 @@ func (cp *CP) Initialized(timeout time.Duration) bool {
 	}
 }
 
+// WatchDog triggers meter values messages if older than timeout.
+// Must be wrapped in a goroutine.
 func (cp *CP) WatchDog(timeout time.Duration) {
-	cp.timeout = timeout
+	for ; true; <-time.NewTicker(timeout).C {
+		cp.mu.Lock()
+		update := cp.txnId != 0 && time.Since(cp.meterUpdated) > timeout
+		cp.mu.Unlock()
 
-	go func() {
-		for ; true; <-time.NewTicker(timeout).C {
-			cp.mu.Lock()
-			update := cp.txnId != 0 && time.Since(cp.meterUpdated) > timeout
-			cp.mu.Unlock()
-
-			if update {
-				Instance().TriggerMessageRequest(cp.ID(), core.MeterValuesFeatureName)
-			}
+		if update {
+			Instance().TriggerMessageRequest(cp.ID(), core.MeterValuesFeatureName)
 		}
-	}()
+	}
 }
 
 // TransactionID returns the current transaction id
@@ -181,8 +183,9 @@ func (cp *CP) CurrentPower() (float64, error) {
 		return 0, api.ErrNotAvailable
 	}
 
-	if power, ok := cp.measurements[string(types.MeasurandPowerActiveImport)]; ok {
-		return strconv.ParseFloat(power.Value, 64)
+	if m, ok := cp.measurements[string(types.MeasurandPowerActiveImport)]; ok {
+		f, err := strconv.ParseFloat(m.Value, 64)
+		return scale(f, m.Unit), err
 	}
 
 	return 0, api.ErrNotAvailable
@@ -198,19 +201,30 @@ func (cp *CP) TotalEnergy() (float64, error) {
 		return 0, api.ErrNotAvailable
 	}
 
-	if power, ok := cp.measurements[string(types.MeasurandEnergyActiveImportRegister)]; ok {
-		f, err := strconv.ParseFloat(power.Value, 64)
-		return f / 1e3, err
+	if m, ok := cp.measurements[string(types.MeasurandEnergyActiveImportRegister)]; ok {
+		f, err := strconv.ParseFloat(m.Value, 64)
+		return scale(f, m.Unit) / 1e3, err
 	}
 
 	return 0, api.ErrNotAvailable
+}
+
+func scale(f float64, scale types.UnitOfMeasure) float64 {
+	switch {
+	case strings.HasPrefix(string(scale), "k"):
+		return f * 1e3
+	case strings.HasPrefix(string(scale), "m"):
+		return f / 1e3
+	default:
+		return f
+	}
 }
 
 func getKeyCurrentPhase(phase int) string {
 	return string(types.MeasurandCurrentImport) + "@L" + strconv.Itoa(phase)
 }
 
-var _ api.MeterCurrent = (*CP)(nil)
+var _ api.PhaseCurrents = (*CP)(nil)
 
 func (cp *CP) Currents() (float64, float64, float64, error) {
 	cp.mu.Lock()
@@ -223,17 +237,17 @@ func (cp *CP) Currents() (float64, float64, float64, error) {
 	currents := make([]float64, 0, 3)
 
 	for phase := 1; phase <= 3; phase++ {
-		current, ok := cp.measurements[getKeyCurrentPhase(phase)]
+		m, ok := cp.measurements[getKeyCurrentPhase(phase)]
 		if !ok {
 			return 0, 0, 0, api.ErrNotAvailable
 		}
 
-		f, err := strconv.ParseFloat(current.Value, 64)
+		f, err := strconv.ParseFloat(m.Value, 64)
 		if err != nil {
 			return 0, 0, 0, fmt.Errorf("invalid current for phase %d: %w", phase, err)
 		}
 
-		currents = append(currents, f)
+		currents = append(currents, scale(f, m.Unit))
 	}
 
 	return currents[0], currents[1], currents[2], nil

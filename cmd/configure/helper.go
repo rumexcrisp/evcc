@@ -398,19 +398,6 @@ func (c *CmdConfigure) processConfig(templateItem *templates.Template, deviceCat
 
 	c.processModbusConfig(templateItem, deviceCategory)
 
-	// TODO remove
-	// type mapped = struct {
-	// 	Name    string
-	// 	Default any
-	// }
-
-	// fmt.Printf("%+v\n", lo.Map(templateItem.Params, func(p templates.Param, _ int) mapped {
-	// 	return mapped{
-	// 		Name:    p.Name,
-	// 		Default: p.Default,
-	// 	}
-	// }))
-
 	return c.processParams(templateItem, deviceCategory)
 }
 
@@ -437,6 +424,10 @@ func (c *CmdConfigure) processParams(templateItem *templates.Template, deviceCat
 
 			if param.Hidden && param.Default != "" {
 				additionalConfig[param.Name] = param.Default
+				continue
+			}
+
+			if usageFilter != "" && len(param.Usages) > 0 && !slices.Contains(param.Usages, string(usageFilter)) {
 				continue
 			}
 

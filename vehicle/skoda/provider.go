@@ -7,14 +7,15 @@ import (
 	"github.com/evcc-io/evcc/provider"
 )
 
-// Provider implements the evcc vehicle api
+// Provider implements the vehicle api
 type Provider struct {
-	statusG  func() (StatusResponse, error)
-	chargerG func() (ChargerResponse, error)
-	action   func(action, value string) error
+	statusG   func() (StatusResponse, error)
+	chargerG  func() (ChargerResponse, error)
+	settingsG func() (SettingsResponse, error)
+	action    func(action, value string) error
 }
 
-// NewProvider provides the evcc vehicle api provider
+// NewProvider creates a vehicle api provider
 func NewProvider(api *API, vin string, cache time.Duration) *Provider {
 	impl := &Provider{
 		statusG: provider.Cached(func() (StatusResponse, error) {
@@ -26,6 +27,9 @@ func NewProvider(api *API, vin string, cache time.Duration) *Provider {
 		// climateG: provider.Cached(func() (interface{}, error) {
 		// 	return api.Climater(vin)
 		// }, cache),
+		settingsG: provider.Cached(func() (SettingsResponse, error) {
+			return api.Settings(vin)
+		}, cache),
 		action: func(action, value string) error {
 			return api.Action(vin, action, value)
 		},
@@ -35,8 +39,8 @@ func NewProvider(api *API, vin string, cache time.Duration) *Provider {
 
 var _ api.Battery = (*Provider)(nil)
 
-// SoC implements the api.Vehicle interface
-func (v *Provider) SoC() (float64, error) {
+// Soc implements the api.Vehicle interface
+func (v *Provider) Soc() (float64, error) {
 	res, err := v.chargerG()
 	if err == nil {
 		return float64(res.Battery.StateOfChargeInPercent), nil
@@ -120,6 +124,18 @@ func (v *Provider) Odometer() (odo float64, err error) {
 
 // 	return active, outsideTemp, targetTemp, err
 // }
+
+var _ api.SocLimiter = (*Provider)(nil)
+
+// TargetSoc implements the api.SocLimiter interface
+func (v *Provider) TargetSoc() (float64, error) {
+	res, err := v.settingsG()
+	if err == nil {
+		return float64(res.TargetStateOfChargeInPercent), nil
+	}
+
+	return 0, err
+}
 
 var _ api.VehicleChargeController = (*Provider)(nil)
 

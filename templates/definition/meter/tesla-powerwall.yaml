@@ -6,6 +6,7 @@ products:
 params:
   - name: usage
     choice: ["grid", "pv", "battery"]
+    allinone: true
   - name: host
   - name: password
     required: true
@@ -14,7 +15,7 @@ params:
       en: Password of the user "customer"
       de: Passwort des Benutzers "Kunde"
 render: |
-  type: tesla
+  type: powerwall
   uri: {{ .host }}
   usage: {{ .usage }}
   user: customer

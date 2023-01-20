@@ -6,9 +6,15 @@ products:
 params:
   - name: usage
     choice: ["grid", "pv", "battery"]
+    allinone: true
   - name: host
+  - name: capacity
+    advanced: true
 render: |
   type: rct
   uri: {{ .host }}
   usage: {{ .usage }}
   cache: 2s
+  {{- if ne .capacity "" }}
+  capacity: {{ .capacity }} # kWh
+  {{- end }}

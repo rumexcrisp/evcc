@@ -8,6 +8,9 @@ import (
 )
 
 const (
+	flagSqlite            = "sqlite"
+	flagSqliteDescription = "SQlite database file"
+
 	flagHeaders            = "log-headers"
 	flagHeadersDescription = "Log headers"
 
@@ -20,8 +23,9 @@ const (
 	flagPhases            = "phases"
 	flagPhasesDescription = "Set usable phases (1 or 3)"
 
-	flagEnable  = "enable"
-	flagDisable = "disable"
+	flagEnable   = "enable"
+	flagDisable  = "disable"
+	flagDiagnose = "diagnose"
 
 	flagWakeup            = "wakeup"
 	flagWakeupDescription = "Wake up"
@@ -36,14 +40,22 @@ const (
 	flagDelay  = "delay"
 )
 
-func bind(cmd *cobra.Command, flag string) {
-	if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
+func bind(cmd *cobra.Command, key string, flagName ...string) {
+	name := key
+	if len(flagName) == 1 {
+		name = flagName[0]
+	}
+	if err := viper.BindPFlag(key, cmd.Flags().Lookup(name)); err != nil {
 		panic(err)
 	}
 }
 
-func bindP(cmd *cobra.Command, flag string) {
-	if err := viper.BindPFlag(flag, cmd.PersistentFlags().Lookup(flag)); err != nil {
+func bindP(cmd *cobra.Command, key string, flagName ...string) {
+	name := key
+	if len(flagName) == 1 {
+		name = flagName[0]
+	}
+	if err := viper.BindPFlag(key, cmd.PersistentFlags().Lookup(name)); err != nil {
 		panic(err)
 	}
 }

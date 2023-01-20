@@ -2,18 +2,17 @@ package server
 
 import (
 	"fmt"
-	"io/fs"
 	"net/http"
 	"time"
 
 	"github.com/evcc-io/evcc/core/site"
+	"github.com/evcc-io/evcc/server/assets"
 	"github.com/evcc-io/evcc/util"
+	"github.com/evcc-io/evcc/util/telemetry"
+	"github.com/go-http-utils/etag"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
-
-// Assets is the embedded assets file system
-var Assets fs.FS
 
 type route struct {
 	Methods     []string
@@ -52,11 +51,15 @@ func NewHTTPd(addr string, hub *SocketHub) *HTTPd {
 	// static - individual handlers per root and folders
 	static := router.PathPrefix("/").Subrouter()
 	static.Use(handlers.CompressHandler)
+	static.Use(handlers.CompressHandler, func(h http.Handler) http.Handler {
+		return etag.Handler(h, false)
+	})
 
 	static.HandleFunc("/", indexHandler())
 	for _, dir := range []string{"assets", "meta"} {
-		static.PathPrefix("/" + dir).Handler(http.FileServer(http.FS(Assets)))
+		static.PathPrefix("/" + dir).Handler(http.FileServer(http.FS(assets.Web)))
 	}
+	static.PathPrefix("/i18n").Handler(http.StripPrefix("/i18n", http.FileServer(http.FS(assets.I18n))))
 
 	srv := &HTTPd{
 		Server: &http.Server{
@@ -94,10 +97,14 @@ func (s *HTTPd) RegisterSiteHandlers(site site.API, cache *util.Cache) {
 	routes := map[string]route{
 		"health":        {[]string{"GET"}, "/health", healthHandler(site)},
 		"state":         {[]string{"GET"}, "/state", stateHandler(cache)},
-		"buffersoc":     {[]string{"POST", "OPTIONS"}, "/buffersoc/{value:[0-9.]+}", floatHandler(site.SetBufferSoC, site.GetBufferSoC)},
-		"prioritysoc":   {[]string{"POST", "OPTIONS"}, "/prioritysoc/{value:[0-9.]+}", floatHandler(site.SetPrioritySoC, site.GetPrioritySoC)},
+		"buffersoc":     {[]string{"POST", "OPTIONS"}, "/buffersoc/{value:[0-9.]+}", floatHandler(site.SetBufferSoc, site.GetBufferSoc)},
+		"prioritysoc":   {[]string{"POST", "OPTIONS"}, "/prioritysoc/{value:[0-9.]+}", floatHandler(site.SetPrioritySoc, site.GetPrioritySoc)},
 		"residualpower": {[]string{"POST", "OPTIONS"}, "/residualpower/{value:[-0-9.]+}", floatHandler(site.SetResidualPower, site.GetResidualPower)},
+		"tariff":        {[]string{"GET"}, "/tariff/{tariff:[a-z]+}", tariffHandler(site)},
 		"sessions":      {[]string{"GET"}, "/sessions", sessionHandler},
+		"sessions2":     {[]string{"DELETE"}, "/sessions/{id:[0-9]+}", sessionHandler},
+		"telemetry":     {[]string{"GET"}, "/settings/telemetry", boolGetHandler(telemetry.Enabled)},
+		"telemetry2":    {[]string{"POST", "OPTIONS"}, "/settings/telemetry/{value:[a-z]+}", boolHandler(telemetry.Enable, telemetry.Enabled)},
 	}
 
 	for _, r := range routes {
@@ -105,20 +112,21 @@ func (s *HTTPd) RegisterSiteHandlers(site site.API, cache *util.Cache) {
 	}
 
 	// loadpoint api
-	for id, lp := range site.LoadPoints() {
-		loadpoint := api.PathPrefix(fmt.Sprintf("/loadpoints/%d", id)).Subrouter()
+	for id, lp := range site.Loadpoints() {
+		loadpoint := api.PathPrefix(fmt.Sprintf("/loadpoints/%d", id+1)).Subrouter()
 
 		routes := map[string]route{
 			"mode":          {[]string{"POST", "OPTIONS"}, "/mode/{value:[a-z]+}", chargeModeHandler(lp)},
-			"targetenergy":  {[]string{"POST", "OPTIONS"}, "/targetenergy/{value:[0-9]+}", intHandler(pass(lp.SetTargetEnergy), lp.GetTargetEnergy)},
-			"targetsoc":     {[]string{"POST", "OPTIONS"}, "/targetsoc/{value:[0-9]+}", intHandler(pass(lp.SetTargetSoC), lp.GetTargetSoC)},
-			"minsoc":        {[]string{"POST", "OPTIONS"}, "/minsoc/{value:[0-9]+}", intHandler(pass(lp.SetMinSoC), lp.GetMinSoC)},
-			"mincurrent":    {[]string{"POST", "OPTIONS"}, "/mincurrent/{value:[0-9]+}", floatHandler(pass(lp.SetMinCurrent), lp.GetMinCurrent)},
-			"maxcurrent":    {[]string{"POST", "OPTIONS"}, "/maxcurrent/{value:[0-9]+}", floatHandler(pass(lp.SetMaxCurrent), lp.GetMaxCurrent)},
+			"minsoc":        {[]string{"POST", "OPTIONS"}, "/minsoc/{value:[0-9]+}", intHandler(pass(lp.SetMinSoc), lp.GetMinSoc)},
+			"mincurrent":    {[]string{"POST", "OPTIONS"}, "/mincurrent/{value:[0-9.]+}", floatHandler(pass(lp.SetMinCurrent), lp.GetMinCurrent)},
+			"maxcurrent":    {[]string{"POST", "OPTIONS"}, "/maxcurrent/{value:[0-9.]+}", floatHandler(pass(lp.SetMaxCurrent), lp.GetMaxCurrent)},
 			"phases":        {[]string{"POST", "OPTIONS"}, "/phases/{value:[0-9]+}", phasesHandler(lp)},
-			"targetcharge":  {[]string{"POST", "OPTIONS"}, "/targetcharge/{soc:[0-9]+}/{time:[0-9TZ:.-]+}", targetChargeHandler(lp)},
-			"targetcharge2": {[]string{"DELETE", "OPTIONS"}, "/targetcharge", targetChargeRemoveHandler(lp)},
-			"vehicle":       {[]string{"POST", "OPTIONS"}, "/vehicle/{vehicle:[0-9]+}", vehicleHandler(site, lp)},
+			"targetenergy":  {[]string{"POST", "OPTIONS"}, "/target/energy/{value:[0-9.]+}", floatHandler(pass(lp.SetTargetEnergy), lp.GetTargetEnergy)},
+			"targetsoc":     {[]string{"POST", "OPTIONS"}, "/target/soc/{value:[0-9]+}", intHandler(pass(lp.SetTargetSoc), lp.GetTargetSoc)},
+			"targettime":    {[]string{"POST", "OPTIONS"}, "/target/time/{time:[0-9TZ:.-]+}", targetTimeHandler(lp)},
+			"targettime2":   {[]string{"DELETE", "OPTIONS"}, "/target/time", targetTimeRemoveHandler(lp)},
+			"plan":          {[]string{"GET"}, "/target/plan", planHandler(lp)},
+			"vehicle":       {[]string{"POST", "OPTIONS"}, "/vehicle/{vehicle:[1-9][0-9]*}", vehicleHandler(site, lp)},
 			"vehicle2":      {[]string{"DELETE", "OPTIONS"}, "/vehicle", vehicleRemoveHandler(lp)},
 			"vehicleDetect": {[]string{"PATCH", "OPTIONS"}, "/vehicle", vehicleDetectHandler(lp)},
 			"remotedemand":  {[]string{"POST", "OPTIONS"}, "/remotedemand/{demand:[a-z]+}/{source::[0-9a-zA-Z_-]+}", remoteDemandHandler(lp)},

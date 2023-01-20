@@ -7,6 +7,7 @@ products:
 params:
   - name: usage
     choice: ["pv", "battery"]
+    allinone: true
   - name: modbus
     choice: ["tcpip"]
     port: 502
@@ -14,6 +15,8 @@ params:
     help:
       en: The Modbus TCP-Server needs to be enabled on this Smart Energy inverter
       de: Der Modbus TCP-Server muss an diesem Smart Energy Wechselrichter aktiviert sein
+  - name: capacity
+    advanced: true
 render: |
   type: custom
   power:
@@ -57,4 +60,7 @@ render: |
       address: 30845 # SMA Modbus Profile: Battery state of charge
       type: holding
       decode: uint32nan
+  {{- if ne .capacity "" }}
+  capacity: {{ .capacity }} # kWh
+  {{- end }}
   {{- end }}

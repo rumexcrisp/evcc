@@ -8,10 +8,10 @@
 			class="btn btn-sm btn-outline-secondary position-relative border-0 menu-button"
 		>
 			<span
-				v-if="logoutCount > 0"
+				v-if="showBadge"
 				class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle"
 			>
-				<span class="visually-hidden">login available</span>
+				<span class="visually-hidden">action required</span>
 			</span>
 			<shopicon-regular-menu></shopicon-regular-menu>
 		</button>
@@ -24,6 +24,10 @@
 
 			<li>
 				<button type="button" class="dropdown-item" @click="openSettingsModal">
+					<span
+						v-if="sponsorTokenExpires"
+						class="d-inline-block p-1 rounded-circle bg-danger border border-light rounded-circle"
+					></span>
 					{{ $t("header.settings") }}
 				</button>
 			</li>
@@ -48,43 +52,13 @@
 				</li>
 			</template>
 			<li>
-				<a class="dropdown-item d-flex" href="https://docs.evcc.io/blog/" target="_blank">
-					<span>{{ $t("header.blog") }}</span>
-					<shopicon-regular-newtab
-						size="s"
-						class="ms-2 external"
-					></shopicon-regular-newtab>
-				</a>
-			</li>
-			<li>
-				<a
-					class="dropdown-item d-flex"
-					href="https://docs.evcc.io/docs/Home/"
-					target="_blank"
-				>
-					<span>{{ $t("header.docs") }}</span>
-					<shopicon-regular-newtab
-						size="s"
-						class="ms-2 external"
-					></shopicon-regular-newtab>
-				</a>
-			</li>
-			<li>
-				<a
-					class="dropdown-item d-flex"
-					href="https://github.com/evcc-io/evcc"
-					target="_blank"
-				>
-					<span>{{ $t("header.github") }}</span>
-					<shopicon-regular-newtab
-						size="s"
-						class="ms-2 external"
-					></shopicon-regular-newtab>
-				</a>
+				<button type="button" class="dropdown-item" @click="openHelpModal">
+					<span>{{ $t("header.needHelp") }}</span>
+				</button>
 			</li>
 			<li>
 				<a class="dropdown-item d-flex" href="https://evcc.io/" target="_blank">
-					<span>{{ $t("header.about") }}</span>
+					<span>evcc.io</span>
 					<shopicon-regular-newtab
 						size="s"
 						class="ms-2 external"
@@ -92,7 +66,8 @@
 				</a>
 			</li>
 		</ul>
-		<GlobalSettingsModal :sponsor="sponsor" />
+		<GlobalSettingsModal v-bind="globalSettingsModalProps" />
+		<HelpModal />
 	</div>
 </template>
 
@@ -104,12 +79,15 @@ import "@h2d2/shopicons/es/regular/moonstars";
 import "@h2d2/shopicons/es/regular/menu";
 import "@h2d2/shopicons/es/regular/newtab";
 import GlobalSettingsModal from "./GlobalSettingsModal.vue";
+import HelpModal from "./HelpModal.vue";
+import collector from "../mixins/collector";
 
 import baseAPI from "../baseapi";
 
 export default {
 	name: "TopNavigation",
-	components: { GlobalSettingsModal },
+	components: { GlobalSettingsModal, HelpModal },
+	mixins: [collector],
 	props: {
 		vehicleLogins: {
 			type: Object,
@@ -118,8 +96,12 @@ export default {
 			},
 		},
 		sponsor: String,
+		sponsorTokenExpires: Number,
 	},
 	computed: {
+		globalSettingsModalProps: function () {
+			return this.collectProps(GlobalSettingsModal);
+		},
 		logoutCount() {
 			return this.providerLogins.filter((login) => !login.loggedIn).length;
 		},
@@ -130,6 +112,12 @@ export default {
 				loginPath: v.uri + "/login",
 				logoutPath: v.uri + "/logout",
 			}));
+		},
+		loginRequired() {
+			return this.logoutCount > 0;
+		},
+		showBadge() {
+			return this.loginRequired || this.sponsorTokenExpires;
 		},
 	},
 	mounted() {
@@ -150,6 +138,10 @@ export default {
 		},
 		openSettingsModal() {
 			const modal = Modal.getOrCreateInstance(document.getElementById("globalSettingsModal"));
+			modal.show();
+		},
+		openHelpModal() {
+			const modal = Modal.getOrCreateInstance(document.getElementById("helpModal"));
 			modal.show();
 		},
 	},

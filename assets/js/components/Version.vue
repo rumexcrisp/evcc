@@ -40,10 +40,7 @@
 				role="dialog"
 				aria-hidden="true"
 			>
-				<div
-					class="modal-dialog modal-dialog-centered modal-dialog-scrollable"
-					role="document"
-				>
+				<div class="modal-dialog modal-dialog-centered" role="document">
 					<div class="modal-content">
 						<div class="modal-header">
 							<h5 class="modal-title">{{ $t("footer.version.modalTitle") }}</h5>
@@ -159,7 +156,7 @@ export default {
 			return (
 				this.available && // available version already computed?
 				this.installed != "[[.Version]]" && // go template parsed?
-				this.installed != "0.0.1-alpha" && // make used?
+				this.installed != "0.0.0" && // make used?
 				this.available != this.installed
 			);
 		},
@@ -175,7 +172,9 @@ export default {
 			}
 		},
 		releaseNotesUrl: function (version) {
-			return `https://github.com/evcc-io/evcc/releases/tag/${version}`;
+			return version == "0.0.0"
+				? `https://github.com/evcc-io/evcc/releases`
+				: `https://github.com/evcc-io/evcc/releases/tag/${version}`;
 		},
 		openModal() {
 			const modal = Modal.getOrCreateInstance(document.getElementById("updateModal"));

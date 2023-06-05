@@ -32,8 +32,8 @@ export default {
         maximumFractionDigits: digits,
       }).format(value)}${unit}`;
     },
-    fmtKWh: function (watt, kw, withUnit, digits) {
-      return this.fmtKw(watt, kw, withUnit, digits) + "h";
+    fmtKWh: function (watt, kw = true, withUnit = true, digits) {
+      return this.fmtKw(watt, kw, withUnit, digits) + (withUnit ? "h" : "");
     },
     fmtNumber: function (number, decimals) {
       return new Intl.NumberFormat(this.$i18n.locale, {
@@ -41,6 +41,15 @@ export default {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       }).format(number);
+    },
+    fmtCo2Short: function (gramms) {
+      return `${this.fmtNumber(gramms, 0)} g`;
+    },
+    fmtCo2Medium: function (gramms) {
+      return `${this.fmtNumber(gramms, 0)} g/kWh`;
+    },
+    fmtCo2Long: function (gramms) {
+      return `${this.fmtNumber(gramms, 0)} gCO₂e/kWh`;
     },
     fmtUnit: function (val) {
       return Math.abs(val) >= this.fmtLimit ? "k" : "";
@@ -132,6 +141,11 @@ export default {
         minute: "numeric",
       }).format(date);
     },
+    weekdayShort: function (date) {
+      return new Intl.DateTimeFormat(this.$i18n.locale, {
+        weekday: "short",
+      }).format(date);
+    },
     fmtAbsoluteDate: function (date) {
       const weekday = this.weekdayPrefix(date);
       const hour = new Intl.DateTimeFormat(this.$i18n.locale, {
@@ -163,11 +177,12 @@ export default {
         year: "numeric",
       }).format(date);
     },
-    fmtMoney: function (amout = 0, currency = "EUR") {
+    fmtMoney: function (amout = 0, currency = "EUR", decimals = true) {
       return new Intl.NumberFormat(this.$i18n.locale, {
         style: "currency",
         currency,
         currencyDisplay: "code",
+        maximumFractionDigits: decimals ? undefined : 0,
       })
         .format(amout)
         .replace(currency, "")
@@ -177,19 +192,22 @@ export default {
       const symbols = { EUR: "€", USD: "$" };
       return symbols[currency] || currency;
     },
-    fmtPricePerKWh: function (amout = 0, currency = "EUR") {
+    fmtPricePerKWh: function (amout = 0, currency = "EUR", short = false) {
       let unit = currency;
       let value = amout;
+      let minimumFractionDigits = 1;
       let maximumFractionDigits = 3;
       if (["EUR", "USD"].includes(currency)) {
         value *= 100;
         unit = "ct";
+        minimumFractionDigits = 1;
         maximumFractionDigits = 1;
       }
       return `${new Intl.NumberFormat(this.$i18n.locale, {
         style: "decimal",
+        minimumFractionDigits,
         maximumFractionDigits,
-      }).format(value)} ${unit}/kWh`;
+      }).format(value)} ${unit}${short ? "" : "/kWh"}`;
     },
     fmtTimeAgo: function (elapsed) {
       const units = {

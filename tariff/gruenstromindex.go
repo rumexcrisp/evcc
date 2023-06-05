@@ -9,6 +9,7 @@ import (
 	"github.com/evcc-io/evcc/api"
 	"github.com/evcc-io/evcc/util"
 	"github.com/evcc-io/evcc/util/request"
+	"golang.org/x/exp/slices"
 )
 
 type GrünStromIndex struct {
@@ -54,7 +55,7 @@ type gsiForecast struct {
 		Signature string `json:"signature"`
 	} `json:"location"`
 	Err     bool
-	Message string
+	Message any
 }
 
 var _ api.Tariff = (*GrünStromIndex)(nil)
@@ -91,11 +92,15 @@ func (t *GrünStromIndex) run(done chan error) {
 	var once sync.Once
 	uri := fmt.Sprintf("https://api.corrently.io/v2.0/gsi/prediction?zip=%s", t.zip)
 
-	for ; true; <-time.NewTicker(time.Hour).C {
+	for ; true; <-time.Tick(time.Hour) {
 		var res gsiForecast
 		err := t.GetJSON(uri, &res)
 		if err == nil && res.Err {
-			err = errors.New(res.Message)
+			if s, ok := res.Message.(string); ok {
+				err = errors.New(s)
+			} else {
+				err = api.ErrNotAvailable
+			}
 		}
 
 		if err != nil {
@@ -123,14 +128,14 @@ func (t *GrünStromIndex) run(done chan error) {
 	}
 }
 
-// Unit implements the api.Tariff interface
-func (t *GrünStromIndex) Unit() string {
-	return "gCO2eq"
-}
-
 // Rates implements the api.Tariff interface
 func (t *GrünStromIndex) Rates() (api.Rates, error) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
-	return append(api.Rates{}, t.data...), outdatedError(t.updated, time.Hour)
+	return slices.Clone(t.data), outdatedError(t.updated, time.Hour)
+}
+
+// Type returns the tariff type
+func (t *GrünStromIndex) Type() api.TariffType {
+	return api.TariffTypeCo2
 }

@@ -17,8 +17,13 @@
 				class="mt-1 mt-sm-2 flex-grow-1"
 				:loadpoints="loadpoints"
 				:vehicles="vehicles"
+				:smartCostLimit="smartCostLimit"
+				:smartCostType="smartCostType"
+				:tariffGrid="tariffGrid"
+				:tariffCo2="tariffCo2"
+				:currency="currency"
 			/>
-			<Vehicles v-if="showParkingLot" />
+			<VehcileSettingsModal />
 			<Footer v-bind="footer"></Footer>
 		</div>
 	</div>
@@ -28,9 +33,9 @@
 import "@h2d2/shopicons/es/regular/arrowup";
 import TopNavigation from "./TopNavigation.vue";
 import Notifications from "./Notifications.vue";
+import VehcileSettingsModal from "./VehicleSettingsModal.vue";
 import Energyflow from "./Energyflow/Energyflow.vue";
 import Loadpoints from "./Loadpoints.vue";
-import Vehicles from "./Vehicles.vue";
 import Footer from "./Footer.vue";
 import formatter from "../mixins/formatter";
 import collector from "../mixins/collector";
@@ -43,7 +48,7 @@ export default {
 		Footer,
 		Notifications,
 		TopNavigation,
-		Vehicles,
+		VehcileSettingsModal,
 	},
 	mixins: [formatter, collector],
 	props: {
@@ -58,27 +63,34 @@ export default {
 		homePower: Number,
 		pvConfigured: Boolean,
 		pvPower: Number,
+		pv: Array,
 		batteryConfigured: Boolean,
 		batteryPower: Number,
 		batterySoc: Number,
+		battery: Array,
 		gridCurrents: Array,
 		prioritySoc: Number,
+		bufferSoc: Number,
+		bufferStartSoc: Number,
 		siteTitle: String,
 		vehicles: Array,
 
 		auth: Object,
 
-		// footer
 		currency: String,
 		savingsAmount: Number,
 		savingsEffectivePrice: Number,
 		savingsGridCharged: Number,
 		savingsSelfConsumptionCharged: Number,
 		savingsSelfConsumptionPercent: Number,
-		savingsSince: Number,
+		savingsSince: String,
 		savingsTotalCharged: Number,
+		greenShare: Number,
 		tariffFeedIn: Number,
 		tariffGrid: Number,
+		tariffEffectivePrice: Number,
+		tariffCo2: Number,
+		tariffEffectiveCo2: Number,
 
 		availableVersion: String,
 		releaseNotes: String,
@@ -86,20 +98,23 @@ export default {
 		uploadMessage: String,
 		uploadProgress: Number,
 		sponsor: String,
+		sponsorTokenExpires: Number,
+		smartCostLimit: Number,
+		smartCostType: String,
 	},
 	computed: {
 		energyflow: function () {
 			return this.collectProps(Energyflow);
 		},
 		activeLoadpoints: function () {
-			return this.loadpoints.filter((lp) => lp.chargePower > 0);
+			return this.loadpoints.filter((lp) => lp.charging);
 		},
 		activeLoadpointsCount: function () {
 			return this.activeLoadpoints.length;
 		},
 		vehicleIcons: function () {
 			if (this.activeLoadpointsCount) {
-				return this.activeLoadpoints.map((lp) => lp.vehicleIcon || "car");
+				return this.activeLoadpoints.map((lp) => lp.chargerIcon || lp.vehicleIcon || "car");
 			}
 			return ["car"];
 		},

@@ -113,7 +113,7 @@ func (v *Provider) Status() (api.ChargeStatus, error) {
 	status := api.StatusNone
 	if err == nil {
 		status = api.StatusA
-		if res.EvStatus.BatteryPlugin > 0 {
+		if res.EvStatus.BatteryPlugin > 0 || res.EvStatus.ChargePortDoorOpenStatus == 1 {
 			status = api.StatusB
 		}
 		if res.EvStatus.BatteryCharge {
@@ -193,4 +193,13 @@ func (v *Provider) Position() (float64, float64, error) {
 	res, err := v.statusLG()
 	coord := res.ResMsg.VehicleStatusInfo.VehicleLocation.Coord
 	return coord.Lat, coord.Lon, err
+}
+
+var _ api.Resurrector = (*Provider)(nil)
+
+// WakeUp implements the api.Resurrector interface
+func (v *Provider) WakeUp() error {
+	// forcing an update will usually make the car start charging even if the (first) resulting status still says it does not charge...
+	_, err := v.refreshG()
+	return err
 }

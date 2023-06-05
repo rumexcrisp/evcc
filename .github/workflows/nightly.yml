@@ -43,6 +43,13 @@ jobs:
           ref: refs/heads/master # force master
           fetch-depth: 0
 
+      - name: Get dist from cache
+        uses: actions/cache/restore@v3
+        id: cache-dist
+        with:
+          path: dist
+          key: ${{ runner.os }}-${{ github.sha }}-dist
+
       - name: Login
         uses: docker/login-action@v2
         with:
@@ -53,13 +60,12 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Publish
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v6
           push: true
           tags: |
-            andig/evcc:nightly
             evcc/evcc:nightly
 
   apt:
@@ -73,10 +79,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: ^1.18
-          cache: true
+          go-version: ^1.20
         id: go
 
       - name: Install Cloudsmith CLI
@@ -85,11 +90,18 @@ jobs:
       - name: Patch ASN1
         run: make patch-asn1-sudo
 
+      - name: Get dist from cache
+        uses: actions/cache/restore@v3
+        id: cache-dist
+        with:
+          path: dist
+          key: ${{ runner.os }}-${{ github.sha }}-dist
+
       - name: Create nightly build
         uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
-          args: --snapshot -f .goreleaser-nightly.yml --rm-dist
+          args: --snapshot -f .goreleaser-nightly.yml --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

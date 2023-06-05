@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -39,6 +41,18 @@ const (
 	StatusE    ChargeStatus = "E" // Fzg. angeschlossen:   ja    Laden aktiv: nein    - Fehler (Kurzschluss)
 	StatusF    ChargeStatus = "F" // Fzg. angeschlossen:   ja    Laden aktiv: nein    - Fehler (Ausfall Wallbox)
 )
+
+// ChargeStatusString converts a string to ChargeStatus
+func ChargeStatusString(s string) (ChargeStatus, error) {
+	switch status := strings.ToUpper(s); status {
+	case "A", "B", "C":
+		return ChargeStatus(status), nil
+	case "D", "E", "F":
+		return ChargeStatus(status), fmt.Errorf("invalid status: %s", status)
+	default:
+		return StatusNone, fmt.Errorf("invalid status: %s", s)
+	}
+}
 
 // String implements Stringer
 func (c ChargeStatus) String() string {
@@ -137,9 +151,9 @@ type Authorizer interface {
 type Vehicle interface {
 	Battery
 	BatteryCapacity
+	IconDescriber
 	Title() string
 	SetTitle(string)
-	Icon() string
 	Phases() int
 	Identifiers() []string
 	OnIdentified() ActionConfig
@@ -158,7 +172,7 @@ type VehicleRange interface {
 
 // VehicleClimater provides climatisation data
 type VehicleClimater interface {
-	Climater() (active bool, outsideTemp, targetTemp float64, err error)
+	Climater() (bool, error)
 }
 
 // VehicleOdometer returns the vehicles milage
@@ -187,20 +201,10 @@ type Resurrector interface {
 	WakeUp() error
 }
 
-// Rate is a grid tariff rate
-type Rate struct {
-	Start time.Time `json:"start"`
-	End   time.Time `json:"end"`
-	Price float64   `json:"price"`
-}
-
-// Rates is a slice of (future) tariff rates
-type Rates []Rate
-
 // Tariff is a tariff capable of retrieving tariff rates
 type Tariff interface {
-	Unit() string
 	Rates() (Rates, error)
+	Type() TariffType
 }
 
 // AuthProvider is the ability to provide OAuth authentication through the ui
@@ -210,10 +214,14 @@ type AuthProvider interface {
 	LogoutHandler() http.HandlerFunc
 }
 
+// IconDescriber optionally provides an icon
+type IconDescriber interface {
+	Icon() string
+}
+
 // FeatureDescriber optionally provides a list of supported non-api features
 type FeatureDescriber interface {
 	Features() []Feature
-	Has(Feature) bool
 }
 
 // CsvWriter converts to csv

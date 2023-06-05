@@ -16,6 +16,8 @@ type API interface {
 
 	GetBufferSoc() float64
 	SetBufferSoc(float64) error
+	GetBufferStartSoc() float64
+	SetBufferStartSoc(float64) error
 	GetPrioritySoc() float64
 	SetPrioritySoc(float64) error
 
@@ -34,9 +36,11 @@ type API interface {
 	GetVehicles() []api.Vehicle
 
 	//
-	// Tariffs
+	// tariffs and costs
 	//
 
 	// GetTariff returns the respective tariff
 	GetTariff(string) api.Tariff
+	GetSmartCostLimit() float64
+	SetSmartCostLimit(float64) error
 }

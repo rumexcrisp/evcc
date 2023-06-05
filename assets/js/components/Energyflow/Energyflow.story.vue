@@ -13,7 +13,14 @@ import Energyflow from "./Energyflow.vue";
 				:homePower="800"
 				:loadpointsPower="4200"
 				:activeLoadpointsCount="3"
+				:tariffGrid="0.25"
+				:tariffFeedIn="0.08"
+				:tariffEffectivePrice="0.08"
+				smartCostType="price"
+				smartCostAvailable
+				currency="EUR"
 				siteTitle="Home"
+				:pv="[{ power: 5000 }, { power: 2300 }]"
 			/>
 		</Variant>
 		<Variant title="battery and grid">
@@ -26,7 +33,15 @@ import Energyflow from "./Energyflow.vue";
 				:homePower="2000"
 				:batteryPower="800"
 				:batterySoc="77"
+				:tariffGrid="0.25"
+				:tariffFeedIn="0.08"
+				:tariffEffectivePrice="0.08"
+				currency="EUR"
 				siteTitle="Home"
+				:battery="[
+					{ soc: 44.999, capacity: 13.3 },
+					{ soc: 82.3331, capacity: 21 },
+				]"
 			/>
 		</Variant>
 		<Variant title="battery charging">
@@ -111,7 +126,32 @@ import Energyflow from "./Energyflow.vue";
 				:homePower="300"
 				:batteryPower="-100"
 				:batterySoc="55"
+				:tariffGrid="0.25"
+				:tariffFeedIn="0.08"
+				:tariffEffectivePrice="0.08"
+				currency="EUR"
 				siteTitle="Home"
+			/>
+		</Variant>
+		<Variant title="co2">
+			<Energyflow
+				gridConfigured
+				pvConfigured
+				:pvPower="7300"
+				:gridPower="-2300"
+				:homePower="800"
+				:loadpointsPower="4200"
+				:activeLoadpointsCount="3"
+				:tariffGrid="0.25"
+				:tariffFeedIn="0.08"
+				:tariffEffectivePrice="0.08"
+				:tariffCo2="723"
+				:tariffEffectiveCo2="0"
+				smartCostType="co2"
+				smartCostAvailable
+				currency="EUR"
+				siteTitle="Home"
+				:pv="[{ power: 5000 }, { power: 2300 }]"
 			/>
 		</Variant>
 	</Story>

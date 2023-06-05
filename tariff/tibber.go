@@ -11,6 +11,7 @@ import (
 	"github.com/evcc-io/evcc/util"
 	"github.com/evcc-io/evcc/util/request"
 	"github.com/shurcooL/graphql"
+	"golang.org/x/exp/slices"
 )
 
 type Tibber struct {
@@ -34,7 +35,6 @@ func NewTibberFromConfig(other map[string]interface{}) (api.Tariff, error) {
 		Token  string
 		HomeID string
 		Unit   string
-		Cheap  any // TODO deprecated
 	}
 
 	if err := util.DecodeOther(other, &cc); err != nil {
@@ -68,11 +68,6 @@ func NewTibberFromConfig(other map[string]interface{}) (api.Tariff, error) {
 		}
 	}
 
-	// TODO deprecated
-	if cc.Cheap != nil {
-		t.log.WARN.Println("cheap rate configuration has been replaced by target charging and is deprecated")
-	}
-
 	done := make(chan error)
 	go t.run(done)
 	err := <-done
@@ -97,7 +92,7 @@ func (t *Tibber) run(done chan error) {
 		"id": graphql.ID(t.homeID),
 	}
 
-	for ; true; <-time.NewTicker(time.Hour).C {
+	for ; true; <-time.Tick(time.Hour) {
 		ctx, cancel := context.WithTimeout(context.Background(), request.Timeout)
 		err := t.client.Query(ctx, &res, v)
 		cancel()
@@ -135,14 +130,14 @@ func (t *Tibber) rates(pi []tibber.Price) api.Rates {
 	return data
 }
 
-// Unit implements the api.Tariff interface
-func (t *Tibber) Unit() string {
-	return t.unit
-}
-
 // Rates implements the api.Tariff interface
 func (t *Tibber) Rates() (api.Rates, error) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
-	return append([]api.Rate{}, t.data...), outdatedError(t.updated, time.Hour)
+	return slices.Clone(t.data), outdatedError(t.updated, time.Hour)
+}
+
+// Type returns the tariff type
+func (t *Tibber) Type() api.TariffType {
+	return api.TariffTypePriceDynamic
 }

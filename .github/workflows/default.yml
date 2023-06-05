@@ -15,10 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      # - uses: actions/setup-go@v4
+      - uses: erezrokah/setup-go@feat/add_cache_prefix
         with:
-          go-version: ^1.18
-          cache: true
+          go-version: ^1.20
+          cache-key-prefix: clean-cache-
         id: go
 
       - name: Install tools
@@ -26,6 +27,12 @@ jobs:
 
       - name: Assets
         run: make assets
+
+      - name: Docs
+        run: make docs
+
+      - name: Toml
+        run: make toml
 
       - name: Porcelain
         run: make porcelain
@@ -37,17 +44,31 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: erezrokah/setup-go@feat/add_cache_prefix
         with:
-          go-version: ^1.18
-          cache: true
+          go-version: ^1.20
+          cache-key-prefix: build-cache-
         id: go
 
-      - name: Patch ASN1
-        run: make patch-asn1-sudo
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install UI
+        run: make install-ui
+
+      - name: Build UI
+        run: make ui
 
       - name: Build
         run: make build
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: evcc-binary
+          path: ./evcc
 
   test:
     name: Test
@@ -56,17 +77,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      # - uses: actions/setup-go@v4
+      - uses: erezrokah/setup-go@feat/add_cache_prefix
         with:
-          go-version: ^1.18
-          cache: true
+          go-version: ^1.20
+          cache-key-prefix: test-cache-
         id: go
 
-      - name: Patch ASN1
-        run: make patch-asn1-sudo
-
       - name: Test
-        run: make test
+        run: mkdir dist && touch dist/empty && make test
 
   lint:
     name: Lint
@@ -75,19 +94,21 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: ^1.18
-          cache: true
+          go-version: ^1.20
+          cache: false # avoid cache thrashing
         id: go
+
+      - run: mkdir dist && touch dist/empty
 
       - name: Lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          args: --timeout 3m
+          args: --timeout 5m
 
-  build-ui:
+  ui:
     name: UI
     runs-on: ubuntu-latest
 
@@ -97,26 +118,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
+          cache: "npm"
 
-      - name: Get NPM cache dir
-        id: npm-cache-dir
-        run: |
-          echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
-
-      - name: Cache NPM modules
-        uses: actions/cache@v3
-        id: npm-cache
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install tools
+      - name: Install
         run: make install-ui
-
-      - name: Build
-        run: make ui
 
       - name: Lint
         run: make lint-ui
@@ -127,3 +132,45 @@ jobs:
       - name: Porcelain
         run: |
           test -z "$(git status --porcelain)" || (git status; git diff; false)
+
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install npm
+        run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Wait for Build
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          check-name: Build
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: evcc-binary
+
+      - name: Make executable
+        run: chmod +x evcc
+
+      - name: Run tests
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30

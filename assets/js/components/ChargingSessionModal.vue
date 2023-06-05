@@ -7,7 +7,7 @@
 			role="dialog"
 			aria-hidden="true"
 		>
-			<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+			<div class="modal-dialog modal-dialog-centered" role="document">
 				<div v-if="session" class="modal-content">
 					<div class="modal-header">
 						<h5>{{ $t("session.title") }}</h5>
@@ -19,7 +19,7 @@
 						></button>
 					</div>
 					<div class="modal-body">
-						<table class="table">
+						<table class="table align-middle">
 							<tbody>
 								<tr>
 									<th>
@@ -34,15 +34,32 @@
 										{{ $t("sessions.vehicle") }}
 									</th>
 									<td>
-										{{ session.vehicle }}
+										<VehicleOptions
+											:id="session.vehicle"
+											class="options"
+											:vehicles="vehicles"
+											:is-unknown="false"
+											@change-vehicle="changeVehicle"
+											@remove-vehicle="removeVehicle"
+										>
+											<span class="flex-grow-1 text-truncate vehicle-name">
+												{{
+													session.vehicle
+														? session.vehicle
+														: $t("main.vehicle.unknown")
+												}}
+											</span>
+										</VehicleOptions>
 									</td>
 								</tr>
 								<tr>
-									<th>
-										{{ $t("session.odometer") }}
+									<th class="align-baseline">
+										{{ $t("session.date") }}
 									</th>
 									<td>
-										{{ formatKm(session.odometer) }}
+										{{ fmtFullDateTime(new Date(session.created), false) }}
+										<br />
+										{{ fmtFullDateTime(new Date(session.finished), false) }}
 									</td>
 								</tr>
 								<tr>
@@ -53,36 +70,51 @@
 										{{ fmtKWh(session.chargedEnergy * 1e3) }}
 									</td>
 								</tr>
-								<tr>
-									<th>
-										{{ $t("session.meterstart") }}
+								<tr v-if="session.solarPercentage != null">
+									<th class="align-baseline">
+										{{ $t("sessions.solar") }}
 									</th>
 									<td>
-										{{ fmtKWh(session.meterStart * 1e3) }}
+										{{ fmtNumber(session.solarPercentage, 1) }}% ({{
+											fmtKWh(
+												session.chargedEnergy * 10 * session.solarPercentage
+											)
+										}})
 									</td>
 								</tr>
-								<tr>
-									<th>
-										{{ $t("session.meterstop") }}
+								<tr v-if="session.price != null">
+									<th class="align-baseline">
+										{{ $t("session.price") }}
 									</th>
 									<td>
+										{{ fmtMoney(session.price, currency) }}
+										{{ fmtCurrencySymbol(currency) }}<br />
+										{{ fmtPricePerKWh(session.pricePerKWh, currency) }}
+									</td>
+								</tr>
+								<tr v-if="session.co2PerKWh != null">
+									<th>
+										{{ $t("session.co2") }}
+									</th>
+									<td>
+										{{ fmtCo2Medium(session.co2PerKWh) }}
+									</td>
+								</tr>
+								<tr v-if="session.odometer">
+									<th>
+										{{ $t("session.odometer") }}
+									</th>
+									<td>
+										{{ formatKm(session.odometer) }}
+									</td>
+								</tr>
+								<tr v-if="session.meterStart">
+									<th class="align-baseline">
+										{{ $t("session.meter") }}
+									</th>
+									<td>
+										{{ fmtKWh(session.meterStart * 1e3) }}<br />
 										{{ fmtKWh(session.meterStop * 1e3) }}
-									</td>
-								</tr>
-								<tr>
-									<th>
-										{{ $t("session.started") }}
-									</th>
-									<td>
-										{{ fmtFullDateTime(new Date(session.created), false) }}
-									</td>
-								</tr>
-								<tr>
-									<th>
-										{{ $t("session.finished") }}
-									</th>
-									<td>
-										{{ fmtFullDateTime(new Date(session.finished), false) }}
 									</td>
 								</tr>
 							</tbody>
@@ -93,7 +125,7 @@
 							type="button"
 							class="btn btn-outline-danger"
 							data-bs-dismiss="modal"
-							@click="confirmRemoving()"
+							@click="openRemoveConfirmationModal"
 						>
 							{{ $t("session.delete") }}
 						</button>
@@ -110,7 +142,7 @@
 			role="dialog"
 			aria-hidden="true"
 		>
-			<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+			<div class="modal-dialog modal-dialog-centered" role="document">
 				<div v-if="session" class="modal-content">
 					<div class="modal-header">
 						<h5>{{ $t("sessions.reallyDelete") }}</h5>
@@ -140,42 +172,69 @@
 </template>
 
 <script>
-import Modal from "bootstrap/js/dist/modal";
 import "@h2d2/shopicons/es/regular/checkmark";
-import formatter from "../mixins/formatter";
-import api from "../api";
 import { distanceUnit, distanceValue } from "../units";
+import formatter from "../mixins/formatter";
+import Modal from "bootstrap/js/dist/modal";
+import api from "../api";
+
+import VehicleOptions from "./VehicleOptions.vue";
 
 export default {
 	name: "ChargingSessionModal",
+	components: { VehicleOptions },
 	mixins: [formatter],
 	props: {
 		session: Object,
+		vehicles: [Object],
 	},
-	emits: ["session-deleted"],
+	emits: ["session-changed"],
 	methods: {
 		openSessionDetailsModal() {
 			const modal = Modal.getOrCreateInstance(document.getElementById("sessionDetailsModal"));
 			modal.show();
 		},
-		confirmRemoving() {
+		openRemoveConfirmationModal() {
 			const modal = Modal.getOrCreateInstance(
 				document.getElementById("deleteSessionConfirmationModal")
 			);
 			modal.show();
 		},
-		async removeSession() {
+		formatKm: function (value) {
+			return `${distanceValue(value)} ${distanceUnit()}`;
+		},
+		async changeVehicle(index) {
+			await this.updateSession({
+				vehicle: this.vehicles[index - 1].title,
+			});
+		},
+		async removeVehicle() {
+			await this.updateSession({
+				vehicle: null,
+			});
+		},
+		async updateSession(data) {
 			try {
-				await api.delete("sessions/" + this.session.id);
-				this.$emit("session-deleted");
+				await api.put("session/" + this.session.id, data);
+				this.$emit("session-changed");
 			} catch (err) {
 				console.error(err);
 			}
 		},
-		formatKm: function (value) {
-			return `${distanceValue(value)} ${distanceUnit()}`;
+		async removeSession() {
+			try {
+				await api.delete("session/" + this.session.id);
+				this.$emit("session-changed");
+			} catch (err) {
+				console.error(err);
+			}
 		},
 	},
 };
 </script>
-<style scoped></style>
+
+<style scoped>
+.options .vehicle-name {
+	text-decoration: underline;
+}
+</style>

@@ -1,5 +1,7 @@
 package util
 
+import "reflect"
+
 // TeeAttacher allows to attach a listener to a tee
 type TeeAttacher interface {
 	Attach() <-chan Param
@@ -12,7 +14,9 @@ type Tee struct {
 
 // Attach creates a new receiver channel and attaches it to the tee
 func (t *Tee) Attach() <-chan Param {
-	out := make(chan Param)
+	// TODO find better approach to prevent deadlocks
+	// this will buffer the receiver channel to prevent deadlocks when consumers use mutex-protected loadpoint api
+	out := make(chan Param, 16)
 	t.add(out)
 	return out
 }
@@ -26,6 +30,13 @@ func (t *Tee) add(out chan<- Param) {
 func (t *Tee) Run(in <-chan Param) {
 	for msg := range in {
 		for _, recv := range t.recv {
+			// dereference pointers (https://github.com/evcc-io/evcc/issues/7895)
+			if val := reflect.ValueOf(msg.Val); val.Kind() == reflect.Ptr {
+				if ptr := reflect.Indirect(val); ptr.IsValid() {
+					msg.Val = ptr.Addr().Elem().Interface()
+				}
+			}
+
 			recv <- msg
 		}
 	}

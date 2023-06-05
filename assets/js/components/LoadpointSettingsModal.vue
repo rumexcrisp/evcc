@@ -8,7 +8,7 @@
 			role="dialog"
 			aria-hidden="true"
 		>
-			<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+			<div class="modal-dialog modal-dialog-centered" role="document">
 				<div class="modal-content">
 					<div class="modal-header">
 						<h5 class="modal-title">
@@ -23,47 +23,6 @@
 					</div>
 					<div class="modal-body">
 						<div class="container">
-							<h4
-								v-if="showMinSocSettings"
-								class="d-flex align-items-center mb-3 mt-0 text-evcc"
-							>
-								{{ $t("main.loadpointSettings.vehicle") }}
-								<shopicon-bold-car3 class="ms-2"></shopicon-bold-car3>
-							</h4>
-							<div v-if="showMinSocSettings" class="mb-3 row">
-								<label
-									:for="formId('minsoc')"
-									class="col-sm-4 col-form-label pt-0 pt-sm-1"
-								>
-									{{ $t("main.loadpointSettings.minSoc.label") }}
-								</label>
-								<div class="col-sm-8 pe-0">
-									<select
-										:id="formId('minsoc')"
-										v-model.number="selectedMinSoc"
-										class="form-select form-select-sm mb-2 w-50"
-										@change="changeMinSoc"
-									>
-										<option
-											v-for="soc in [
-												0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
-											]"
-											:key="soc"
-											:value="soc"
-										>
-											{{ soc ? `${soc}%` : "--" }}
-										</option>
-									</select>
-									<small>
-										{{
-											$t("main.loadpointSettings.minSoc.description", [
-												selectedMinSoc || "x",
-											])
-										}}
-									</small>
-								</div>
-							</div>
-
 							<h4
 								v-if="showConfigurablePhases || showCurrentSettings"
 								class="d-flex align-items-center mb-3 mt-4 text-evcc"
@@ -152,7 +111,7 @@
 								</div>
 							</div>
 
-							<div v-if="$hiddenFeatures" class="mb-3 row">
+							<div v-if="$hiddenFeatures()" class="mb-3 row">
 								<label
 									:for="formId('maxcurrent')"
 									class="col-sm-4 col-form-label pt-0 pt-sm-2"
@@ -178,7 +137,7 @@
 								</div>
 							</div>
 
-							<div v-if="$hiddenFeatures" class="mb-3 row">
+							<div v-if="$hiddenFeatures()" class="mb-3 row">
 								<label
 									:for="formId('mincurrent')"
 									class="col-sm-4 col-form-label pt-0 pt-sm-2"
@@ -235,18 +194,12 @@ export default {
 		minCurrent: Number,
 		title: String,
 	},
-	emits: [
-		"phasesconfigured-updated",
-		"maxcurrent-updated",
-		"mincurrent-updated",
-		"minsoc-updated",
-	],
+	emits: ["phasesconfigured-updated", "maxcurrent-updated", "mincurrent-updated"],
 	data: function () {
 		return {
 			selectedMaxCurrent: this.maxCurrent,
 			selectedMinCurrent: this.minCurrent,
 			selectedPhases: this.phasesConfigured,
-			selectedMinSoc: this.minSoc,
 		};
 	},
 	computed: {
@@ -272,10 +225,7 @@ export default {
 			return [0, 1, 3].includes(this.phasesConfigured);
 		},
 		showCurrentSettings: function () {
-			return this.$hiddenFeatures;
-		},
-		showMinSocSettings: function () {
-			return this.$hiddenFeatures;
+			return this.$hiddenFeatures();
 		},
 	},
 	watch: {
@@ -304,9 +254,6 @@ export default {
 		},
 		changePhasesConfigured: function () {
 			this.$emit("phasesconfigured-updated", this.selectedPhases);
-		},
-		changeMinSoc: function () {
-			this.$emit("minsoc-updated", this.selectedMinSoc);
 		},
 		currentOptions: function (max, defaultCurrent = 16) {
 			const result = [];

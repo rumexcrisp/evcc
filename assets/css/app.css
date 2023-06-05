@@ -52,12 +52,14 @@
 	--evcc-transition-very-fast: 100ms;
 
 	--bs-primary: var(--evcc-darker-green);
-	--bs-primary-rgb: 58, 186, 44;
+	--bs-primary-rgb: 11, 166, 49;
 
 	--bs-body-font-size: 14px;
 	--bs-font-sans-serif: Montserrat, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
 		Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
 		"Segoe UI Symbol", "Noto Color Emoji";
+	--bs-success: var(--evcc-primary);
+	--bs-success-rgb: var(--bs-primary-rgb);
 }
 
 :root.dark {
@@ -105,6 +107,11 @@ h4 {
 	font-size: 1.25rem;
 }
 
+h5 {
+	font-size: 1rem;
+	font-weight: bold;
+}
+
 .large {
 	font-size: 1.25rem;
 	line-height: 1.2;
@@ -112,6 +119,18 @@ h4 {
 
 .bg-primary {
 	background-color: var(--evcc-dark-green) !important;
+}
+
+.bg-dark-green {
+	background-color: var(--evcc-dark-green) !important;
+}
+
+.bg-darker-green {
+	background-color: var(--evcc-darker-green) !important;
+}
+
+.bg-darkest-green {
+	background-color: var(--evcc-darkest-green) !important;
 }
 
 .text-primary {
@@ -136,6 +155,10 @@ a:hover {
 
 .rounded {
 	border-radius: 10px !important;
+}
+
+.btn {
+	--bs-btn-border-width: 2px;
 }
 
 .btn-primary,
@@ -167,20 +190,38 @@ a:hover {
 .btn-outline-primary:focus {
 	color: var(--bs-primary);
 	background-color: transparent;
-	border-width: 2px;
 	border-color: var(--bs-primary);
 }
 .btn-outline-primary:hover {
 	color: var(--evcc-accent3) !important;
 	background-color: transparent !important;
-	border-width: 2px;
 	border-color: var(--evcc-accent3) !important;
 }
 .btn-outline-primary:active {
 	color: var(--evcc-default-text) !important;
 	background-color: var(--evcc-accent3) !important;
-	border-width: 2px;
 	border-color: var(--evcc-accent3) !important;
+}
+
+.btn-xs {
+	--bs-btn-padding-y: 0;
+	--bs-btn-padding-x: 0.5rem;
+	--bs-btn-font-size: 0.7rem;
+	--bs-btn-border-radius: 0.25rem;
+	--bs-btn-line-height: 2;
+}
+
+.dark .btn-outline-secondary {
+	--bs-btn-color: var(--bs-gray-bright);
+	--bs-btn-border-color: var(--bs-gray-bright);
+	--bs-btn-hover-bg: var(--bs-gray-bright);
+	--bs-btn-hover-color: var(--bs-gray-dark);
+}
+
+.accordion {
+	--bs-accordion-active-color: var(--bs-text);
+	--bs-accordion-active-bg: var(--evcc-background);
+	--bs-accordion-btn-active-icon: var(--bs-accordion-btn-icon);
 }
 
 .text-evcc {
@@ -207,6 +248,9 @@ a:hover {
 }
 .text-dark {
 	color: var(--bs-gray-dark);
+}
+.text-light {
+	color: var(--bs-gray-bright);
 }
 .text-gray {
 	color: var(--bs-gray-medium);
@@ -346,4 +390,20 @@ small {
 
 .dark .form-switch .form-check-input:checked {
 	background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2328293e'/%3e%3c/svg%3e");
+}
+/* fix desktop safari formatting */
+input::-webkit-datetime-edit {
+	display: block;
+	padding: 0;
+}
+
+.tooltip {
+	--bs-tooltip-opacity: 1;
+	--bs-tooltip-bg: var(--bs-gray-deep);
+	--bs-tooltip-color: var(--bs-white);
+}
+
+.dark .tooltip {
+	--bs-tooltip-bg: var(--bs-white);
+	--bs-tooltip-color: var(--bs-gray-deep);
 }

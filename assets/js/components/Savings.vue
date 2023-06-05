@@ -23,10 +23,7 @@
 				role="dialog"
 				aria-hidden="true"
 			>
-				<div
-					class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"
-					role="document"
-				>
+				<div class="modal-dialog modal-lg modal-dialog-centered" role="document">
 					<div class="modal-content">
 						<div class="modal-header">
 							<h5 class="modal-title">
@@ -69,20 +66,22 @@
 										class="text-accent1"
 										icon="sun"
 										:title="$t('footer.savings.percentTitle')"
-										:value="percent"
+										:value="selfConsumptionPercent"
+										:valueFmt="fmtAnimation"
 										unit="%"
 										:sub1="
 											$t('footer.savings.percentSelf', {
 												self: fmtKw(
 													selfConsumptionCharged * 1000,
 													true,
-													false
+													false,
+													0
 												),
 											})
 										"
 										:sub2="
 											$t('footer.savings.percentGrid', {
-												grid: fmtKw(gridCharged * 1000, true, false),
+												grid: fmtKw(gridCharged * 1000, true, false, 0),
 											})
 										"
 									/>
@@ -109,12 +108,12 @@
 										class="text-accent3"
 										icon="coinjar"
 										:title="$t('footer.savings.savingsTitle')"
-										:value="fmtMoney(amount, currency)"
+										:value="fmtMoney(amount, currency, amount < 100)"
 										:unit="fmtCurrencySymbol(currency)"
 										:sub1="$t('footer.savings.savingsComparedToGrid')"
 										:sub2="
 											$t('footer.savings.savingsTotalEnergy', {
-												total: fmtKw(totalCharged * 1000, true, false),
+												total: fmtKw(totalCharged * 1000, true, false, 0),
 											})
 										"
 									/>
@@ -123,7 +122,7 @@
 									<small>
 										{{
 											$t("footer.savings.since", {
-												since: fmtDayMonthYear(startDate),
+												since: startDate,
 											})
 										}}
 									</small>
@@ -157,7 +156,7 @@ export default {
 	mixins: [formatter],
 	props: {
 		selfConsumptionPercent: Number,
-		since: { type: Number, default: 0 },
+		since: String,
 		sponsor: String,
 		amount: { type: Number, default: 0 },
 		effectivePrice: { type: Number, default: 0 },
@@ -182,7 +181,10 @@ export default {
 			return { value, unit };
 		},
 		startDate() {
-			return new Date(this.since * 1000);
+			if (this.since) {
+				return this.fmtDayMonthYear(new Date(this.since));
+			}
+			return "";
 		},
 	},
 	methods: {
@@ -195,6 +197,12 @@ export default {
 		openModal() {
 			const modal = Modal.getOrCreateInstance(document.getElementById("savingsModal"));
 			modal.show();
+		},
+		fmtAnimation(number) {
+			let decimals = 0;
+			if (number < 100) decimals = 1;
+			if (number < 10) decimals = 2;
+			return this.fmtNumber(number, decimals);
 		},
 	},
 };

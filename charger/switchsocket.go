@@ -5,17 +5,20 @@ import "github.com/evcc-io/evcc/api"
 // switchSocket implements the api.Charger Status and CurrentPower methods
 // using basic generic switch socket functions
 type switchSocket struct {
+	*embed
 	enabled      func() (bool, error)
 	currentPower func() (float64, error)
 	standbypower float64
 }
 
 func NewSwitchSocket(
+	embed *embed,
 	enabled func() (bool, error),
 	currentPower func() (float64, error),
 	standbypower float64,
 ) *switchSocket {
 	return &switchSocket{
+		embed:        embed,
 		enabled:      enabled,
 		currentPower: currentPower,
 		standbypower: standbypower,
@@ -43,6 +46,18 @@ func (c *switchSocket) Status() (api.ChargeStatus, error) {
 	}
 
 	return res, err
+}
+
+// MaxCurrent implements the api.Charger interface
+func (c *switchSocket) MaxCurrent(current int64) error {
+	return nil
+}
+
+var _ api.ChargerEx = (*switchSocket)(nil)
+
+// MaxCurrentMillis implements the api.ChargerEx interface
+func (c *switchSocket) MaxCurrentMillis(current float64) error {
+	return nil
 }
 
 var _ api.Meter = (*switchSocket)(nil)

@@ -98,7 +98,7 @@ func (wb *Innogy) Status() (api.ChargeStatus, error) {
 
 	switch r := rune(b[0]); r {
 	case 'A', 'B', 'D', 'E', 'F':
-		return api.ChargeStatus(r), nil
+		return api.ChargeStatusString(string(r))
 	case 'C':
 		// C1 is "connected"
 		if rune(b[1]) == '1' {
@@ -168,6 +168,10 @@ var _ api.Meter = (*Innogy)(nil)
 
 // CurrentPower implements the api.Meter interface
 func (wb *Innogy) CurrentPower() (float64, error) {
+	// https://github.com/evcc-io/evcc/issues/6848
+	if status, err := wb.Status(); status != api.StatusC || err != nil {
+		return 0, err
+	}
 	l1, l2, l3, err := wb.Currents()
 	return 230 * (l1 + l2 + l3), err
 }

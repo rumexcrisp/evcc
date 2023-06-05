@@ -80,7 +80,7 @@ func (t *ElectricityMaps) run(done chan error) {
 	var once sync.Once
 	uri := fmt.Sprintf("%s/carbon-intensity/forecast?zone=%s", t.uri, t.zone)
 
-	for ; true; <-time.NewTicker(time.Hour).C {
+	for ; true; <-time.Tick(time.Hour) {
 		var res CarbonIntensity
 		if err := t.GetJSON(uri, &res); err != nil {
 			if res.Error != "" {
@@ -102,11 +102,6 @@ func (t *ElectricityMaps) run(done chan error) {
 	}
 }
 
-// Unit implements the api.Tariff interface
-func (t *ElectricityMaps) Unit() string {
-	return "gCO2eq"
-}
-
 func (t *ElectricityMaps) Rates() (api.Rates, error) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
@@ -122,4 +117,9 @@ func (t *ElectricityMaps) Rates() (api.Rates, error) {
 	}
 
 	return res, outdatedError(t.updated, time.Hour)
+}
+
+// Type returns the tariff type
+func (t *ElectricityMaps) Type() api.TariffType {
+	return api.TariffTypeCo2
 }

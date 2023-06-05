@@ -147,7 +147,12 @@ func (s *StatusResponseMobile) MeasurementByKey(key string) (*MeasurementMobile,
 		if m.Key == key {
 			var err error
 			if !m.Status.IsEnabled {
-				if m.Status.Cause != "UNKNOWN" {
+				switch m.Status.Cause {
+				case "UNKNOWN":
+					break
+				case "PRIVACY_ACTIVATED", "LICENSE_DEACTIVATED", "NOT_SUPPORTED":
+					err = api.ErrNotAvailable
+				default:
 					err = errors.New(m.Status.Cause)
 				}
 			}
@@ -195,7 +200,7 @@ type CapabilitiesResponse struct {
 }
 
 type EmobilityResponse struct {
-	BatteryChargeStatus struct {
+	BatteryChargeStatus *struct {
 		ChargeRate struct {
 			Unit             string
 			Value            float64

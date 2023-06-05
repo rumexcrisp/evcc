@@ -12,10 +12,10 @@
 
 		<div class="row">
 			<main class="col-12">
-				<div class="mb-4">
+				<div class="d-flex justify-content-start mb-4">
 					<a
 						class="btn btn-outline-secondary text-nowrap my-2"
-						:href="`./api/sessions?format=csv&amp;lang=${$i18n.locale}`"
+						:href="csvHrefLink()"
 						download="sessions.csv"
 					>
 						{{ $t("sessions.downloadCsv") }}
@@ -23,102 +23,112 @@
 				</div>
 
 				<div v-for="group in sessionsByMonthAndLoadpoint" :key="group.month">
-					<div class="mx-2">
-						<div class="d-flex align-items-baseline my-5">
-							<h2 class="me-4 mb-0">
-								{{ formatGroupHeadline(group.month) }}
-							</h2>
+					<div class="d-flex align-items-center my-5">
+						<h2 class="me-4 mb-0">
+							{{ formatGroupHeadline(group.month) }}
+						</h2>
+						<a
+							class="btn btn-xs btn-outline-secondary text-nowrap"
+							:href="csvHrefLink(group.month)"
+							download="sessions.csv"
+						>
+							CSV
+						</a>
+					</div>
+
+					<div v-for="loadpoint in group.loadpoints" :key="loadpoint.name">
+						<div class="d-flex align-items-baseline mb-3">
+							<h3 class="me-4 mb-0">
+								{{ loadpoint.name }}
+							</h3>
+							<div class="large">{{ fmtKWh(loadpoint.total) }}</div>
 						</div>
 
-						<div v-for="loadpoint in group.loadpoints" :key="loadpoint.name">
-							<div class="d-flex align-items-baseline mb-3">
-								<h3 class="me-4 mb-0">
-									{{ loadpoint.name }}
-								</h3>
-								<div class="large">{{ fmtKWh(loadpoint.total) }}</div>
-							</div>
-
-							<ul class="breakdown text-gray d-sm-flex flex-sm-wrap ps-0 mb-2">
-								<li
-									v-for="(vehicle, id) in groupedKWh(
-										'vehicle',
-										loadpoint.sessions
-									)"
-									:key="id"
-									class="breakdown-item"
-								>
-									{{ vehicle.name }}: {{ fmtKWh(vehicle.energy) }}
-								</li>
-							</ul>
-							<div class="table-responsive my-3">
-								<table class="table">
-									<thead>
-										<tr>
-											<th scope="col">{{ $t("sessions.vehicle") }}</th>
-											<th scope="col" class="text-end ps-sm-4 pe-md-5">
-												{{ $t("sessions.energy") }}
-											</th>
-											<th scope="col" class="ps-3 ps-md-4 ps-md-5">
-												{{ $t("sessions.date") }}
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										<tr
-											v-for="(session, id) in loadpoint.sessions"
-											:key="id"
-											role="button"
-											@click="showDetails(session)"
-										>
-											<td class="align-middle">
-												{{ session.vehicle }}
-											</td>
-											<td
-												class="text-nowrap text-end ps-sm-4 pe-md-5 align-middle"
-											>
-												{{ fmtKWh(session.chargedEnergy * 1e3) }}
-											</td>
-											<td class="text-nowrap ps-3 ps-md-4 ps-md-5">
-												<span class="d-block d-sm-none">
-													{{
-														fmtFullDateTime(
-															new Date(session.created),
-															true
-														)
-													}}
-													<br />
-													{{
-														fmtFullDateTime(
-															new Date(session.finished),
-															true
-														)
-													}}
-												</span>
-												<span class="d-none d-sm-block">
-													{{
-														fmtFullDateTime(
-															new Date(session.created),
-															false
-														)
-													}}
-													<br />
-													{{
-														fmtFullDateTime(
-															new Date(session.finished),
-															false
-														)
-													}}
-												</span>
-											</td>
-										</tr>
-									</tbody>
-								</table>
-							</div>
+						<ul class="breakdown text-gray d-sm-flex flex-sm-wrap ps-0 mb-2">
+							<li
+								v-for="(vehicle, id) in groupedKWh('vehicle', loadpoint.sessions)"
+								:key="id"
+								class="breakdown-item"
+							>
+								{{ vehicle.name }}: {{ fmtKWh(vehicle.energy) }}
+							</li>
+						</ul>
+						<div class="table-responsive my-3">
+							<table class="table text-nowrap">
+								<thead>
+									<tr>
+										<th scope="col" class="ps-0">{{ $t("sessions.date") }}</th>
+										<th scope="col">{{ $t("sessions.vehicle") }}</th>
+										<th scope="col" class="text-end">
+											{{ $t("sessions.energy") }}
+										</th>
+										<th scope="col" class="text-end">
+											{{ $t("sessions.solar") }}
+										</th>
+										<th scope="col" class="text-end">
+											{{ $t("sessions.price") }}
+										</th>
+										<th scope="col" class="text-end">
+											{{ $t("sessions.avgPrice") }}
+										</th>
+										<th scope="col" class="text-end pe-0">
+											{{ $t("sessions.co2") }}
+										</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr
+										v-for="(session, id) in loadpoint.sessions"
+										:key="id"
+										role="button"
+										@click="showDetails(session.id)"
+									>
+										<td class="ps-0">
+											{{ fmtFullDateTime(new Date(session.created), true) }}
+										</td>
+										<td>
+											{{ session.vehicle }}
+										</td>
+										<td class="text-end">
+											{{ fmtKWh(session.chargedEnergy * 1e3) }}
+										</td>
+										<td class="text-end">
+											<span v-if="session.solarPercentage != null">
+												{{ fmtNumber(session.solarPercentage, 1) }}%
+											</span>
+											<span v-else class="text-muted">-</span>
+										</td>
+										<td class="text-end">
+											<span v-if="session.price != null">
+												{{ fmtMoney(session.price, currency) }}
+												{{ fmtCurrencySymbol(currency) }}
+											</span>
+											<span v-else class="text-muted">-</span>
+										</td>
+										<td class="text-end">
+											<span v-if="session.pricePerKWh != null">
+												{{ fmtPricePerKWh(session.pricePerKWh, currency) }}
+											</span>
+											<span v-else class="text-muted">-</span>
+										</td>
+										<td class="text-end pe-0">
+											<span v-if="session.co2PerKWh != null">
+												{{ fmtCo2Medium(session.co2PerKWh) }}
+											</span>
+											<span v-else class="text-muted">-</span>
+										</td>
+									</tr>
+								</tbody>
+							</table>
 						</div>
 					</div>
 				</div>
 			</main>
-			<ChargingSessionModal :session="selectedSession" @session-deleted="loadSessions" />
+			<ChargingSessionModal
+				:session="selectedSession"
+				:vehicles="vehicles"
+				@session-changed="loadSessions"
+			/>
 		</div>
 	</div>
 </template>
@@ -127,9 +137,9 @@
 import Modal from "bootstrap/js/dist/modal";
 import TopNavigation from "../components/TopNavigation.vue";
 import "@h2d2/shopicons/es/bold/arrowback";
-import "@h2d2/shopicons/es/regular/trash";
 import formatter from "../mixins/formatter";
 import api from "../api";
+import store from "../store";
 import ChargingSessionModal from "../components/ChargingSessionModal.vue";
 
 export default {
@@ -140,7 +150,7 @@ export default {
 		notifications: Array,
 	},
 	data() {
-		return { sessions: [], selectedSession: undefined };
+		return { sessions: [], selectedSessionId: undefined };
 	},
 	computed: {
 		sessionsByMonthAndLoadpoint() {
@@ -162,6 +172,19 @@ export default {
 				return { month, loadpoints };
 			});
 		},
+		vehicles() {
+			return (
+				store.state.vehicles?.map((v, index) => {
+					return { id: index, title: v };
+				}) || []
+			);
+		},
+		selectedSession() {
+			return this.sessions.find((s) => s.id == this.selectedSessionId);
+		},
+		currency() {
+			return store.state.currency;
+		},
 	},
 	mounted() {
 		this.loadSessions();
@@ -173,8 +196,8 @@ export default {
 		},
 		groupByMonth(sessions) {
 			return sessions.reduce((groups, session) => {
-				const date = new Date(session.finished);
-				const month = `${date.getFullYear()}.${date.getMonth()}`;
+				const date = new Date(session.created);
+				const month = `${date.getFullYear()}.${date.getMonth() + 1}`;
 				if (!groups[month]) groups[month] = [];
 				groups[month].push(session);
 				return groups;
@@ -206,14 +229,26 @@ export default {
 		formatGroupHeadline(group) {
 			const date = new Date();
 			const [year, month] = group.split(".");
-			date.setMonth(month);
+			date.setMonth(month - 1);
 			date.setFullYear(year);
 			return this.fmtMonthYear(date);
 		},
-		showDetails(session) {
-			this.selectedSession = session;
+		showDetails(sessionId) {
+			this.selectedSessionId = sessionId;
 			const modal = Modal.getOrCreateInstance(document.getElementById("sessionDetailsModal"));
 			modal.show();
+		},
+		csvHrefLink(groupKey) {
+			var url = `./api/sessions?format=csv&lang=${this.$i18n.locale}`;
+			if (groupKey) {
+				const [year, month] = groupKey.split(".");
+				url += `&year=${year}`;
+
+				if (month) {
+					url += `&month=${month}`;
+				}
+			}
+			return url;
 		},
 	},
 };

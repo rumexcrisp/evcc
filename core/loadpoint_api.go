@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/evcc-io/evcc/api"
@@ -11,6 +12,16 @@ import (
 )
 
 var _ loadpoint.API = (*Loadpoint)(nil)
+
+// Title returns the human-readable loadpoint title
+func (lp *Loadpoint) Title() string {
+	return lp.Title_
+}
+
+// Priority returns the loadpoint priority
+func (lp *Loadpoint) Priority() int {
+	return lp.Priority_
+}
 
 // GetStatus returns the charging status
 func (lp *Loadpoint) GetStatus() api.ChargeStatus {
@@ -57,18 +68,11 @@ func (lp *Loadpoint) SetMode(mode api.ChargeMode) {
 	}
 }
 
-// getChargedEnergy returns loadpoint charge target energy
+// getChargedEnergy returns loadpoint charge target energy in Wh
 func (lp *Loadpoint) getChargedEnergy() float64 {
 	lp.Lock()
 	defer lp.Unlock()
-	return lp.chargedEnergy
-}
-
-// setChargedEnergy returns loadpoint charge target energy
-func (lp *Loadpoint) setChargedEnergy(energy float64) {
-	lp.Lock()
-	defer lp.Unlock()
-	lp.chargedEnergy = energy
+	return lp.sessionEnergy.TotalWh()
 }
 
 // GetTargetEnergy returns loadpoint charge target energy
@@ -81,7 +85,7 @@ func (lp *Loadpoint) GetTargetEnergy() float64 {
 // setTargetEnergy sets loadpoint charge target energy (no mutex)
 func (lp *Loadpoint) setTargetEnergy(energy float64) {
 	lp.targetEnergy = energy
-	lp.publish("targetEnergy", energy)
+	lp.publish(targetEnergy, energy)
 }
 
 // SetTargetEnergy sets loadpoint charge target energy
@@ -215,6 +219,40 @@ func (lp *Loadpoint) setTargetTime(finishAt time.Time) {
 	}
 }
 
+// GetEnableThreshold gets the loadpoint enable threshold
+func (lp *Loadpoint) GetEnableThreshold() float64 {
+	lp.Lock()
+	defer lp.Unlock()
+	return lp.Enable.Threshold
+}
+
+// SetEnableThreshold sets loadpoint enable threshold
+func (lp *Loadpoint) SetEnableThreshold(threshold float64) {
+	lp.Lock()
+	defer lp.Unlock()
+
+	if lp.Enable.Threshold != threshold {
+		lp.Enable.Threshold = threshold
+	}
+}
+
+// GetDisableThreshold gets the loadpoint enable threshold
+func (lp *Loadpoint) GetDisableThreshold() float64 {
+	lp.Lock()
+	defer lp.Unlock()
+	return lp.Disable.Threshold
+}
+
+// SetDisableThreshold sets loadpoint disable threshold
+func (lp *Loadpoint) SetDisableThreshold(threshold float64) {
+	lp.Lock()
+	defer lp.Unlock()
+
+	if lp.Disable.Threshold != threshold {
+		lp.Disable.Threshold = threshold
+	}
+}
+
 // RemoteControl sets remote status demand
 func (lp *Loadpoint) RemoteControl(source string, demand loadpoint.RemoteDemand) {
 	lp.Lock()
@@ -246,6 +284,22 @@ func (lp *Loadpoint) GetChargePower() float64 {
 	return lp.chargePower
 }
 
+// GetChargePowerFlexibility returns the flexible amount of current charging power
+func (lp *Loadpoint) GetChargePowerFlexibility() float64 {
+	// no locking
+	mode := lp.GetMode()
+	if mode == api.ModeNow || !lp.charging() || lp.minSocNotReached() {
+		return 0
+	}
+
+	if mode == api.ModePV {
+		return lp.GetChargePower()
+	}
+
+	// MinPV mode
+	return math.Max(0, lp.GetChargePower()-lp.GetMinPower())
+}
+
 // GetMinCurrent returns the min loadpoint current
 func (lp *Loadpoint) GetMinCurrent() float64 {
 	lp.Lock()
@@ -262,7 +316,7 @@ func (lp *Loadpoint) SetMinCurrent(current float64) {
 
 	if current != lp.MinCurrent {
 		lp.MinCurrent = current
-		lp.publish("minCurrent", lp.MinCurrent)
+		lp.publish(minCurrent, lp.MinCurrent)
 	}
 }
 
@@ -282,7 +336,7 @@ func (lp *Loadpoint) SetMaxCurrent(current float64) {
 
 	if current != lp.MaxCurrent {
 		lp.MaxCurrent = current
-		lp.publish("maxCurrent", lp.MaxCurrent)
+		lp.publish(maxCurrent, lp.MaxCurrent)
 	}
 }
 
@@ -304,10 +358,10 @@ func (lp *Loadpoint) SetRemainingDuration(chargeRemainingDuration time.Duration)
 }
 
 // setRemainingDuration sets the estimated remaining charging duration (no mutex)
-func (lp *Loadpoint) setRemainingDuration(chargeRemainingDuration time.Duration) {
-	if lp.chargeRemainingDuration != chargeRemainingDuration {
-		lp.chargeRemainingDuration = chargeRemainingDuration
-		lp.publish("chargeRemainingDuration", chargeRemainingDuration)
+func (lp *Loadpoint) setRemainingDuration(remainingDuration time.Duration) {
+	if lp.chargeRemainingDuration != remainingDuration {
+		lp.chargeRemainingDuration = remainingDuration
+		lp.publish(chargeRemainingDuration, remainingDuration)
 	}
 }
 
@@ -342,21 +396,18 @@ func (lp *Loadpoint) GetRemainingEnergy() float64 {
 
 // GetVehicle gets the active vehicle
 func (lp *Loadpoint) GetVehicle() api.Vehicle {
-	lp.Lock()
-	defer lp.Unlock()
+	lp.vehicleMux.Lock()
+	defer lp.vehicleMux.Unlock()
 	return lp.vehicle
 }
 
 // SetVehicle sets the active vehicle
 func (lp *Loadpoint) SetVehicle(vehicle api.Vehicle) {
-	// TODO develop universal locking approach
-	// setActiveVehicle is protected by lock, hence no locking here
-
-	// set desired vehicle
+	// set desired vehicle (protected by lock, no locking here)
 	lp.setActiveVehicle(vehicle)
 
-	lp.Lock()
-	defer lp.Unlock()
+	lp.vehicleMux.Lock()
+	defer lp.vehicleMux.Unlock()
 
 	// disable auto-detect
 	lp.stopVehicleDetection()

@@ -2,11 +2,10 @@ template: audi
 products:
   - brand: Audi
     description:
-      de: Andere
-      en: Others
+      generic: legacy
 params:
-  - preset: vehiclebase
-  - preset: vehicleidentify
+  - preset: vehicle-base
+  - preset: vehicle-identify
   - name: vin
     example: WAUZZZ...
 render: |

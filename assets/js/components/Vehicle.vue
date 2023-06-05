@@ -1,11 +1,12 @@
 <template>
 	<div class="vehicle pt-4">
 		<VehicleTitle
+			v-if="!integratedDevice"
 			v-bind="vehicleTitleProps"
 			@change-vehicle="changeVehicle"
 			@remove-vehicle="removeVehicle"
 		/>
-		<VehicleStatus v-if="!parked" v-bind="vehicleStatus" class="mb-2" />
+		<VehicleStatus v-bind="vehicleStatus" class="mb-2" />
 		<VehicleSoc
 			v-bind="vehicleSocProps"
 			class="mt-2 mb-4"
@@ -18,7 +19,7 @@
 				v-if="socBasedCharging"
 				class="flex-grow-1"
 				:label="$t('main.vehicle.vehicleSoc')"
-				:value="vehicleSoc ? `${vehicleSoc}%` : '--'"
+				:value="vehicleSoc ? `${Math.round(vehicleSoc)}%` : '--'"
 				:extraValue="range ? `${Math.round(range)} ${rangeUnit}` : null"
 				align="start"
 			/>
@@ -30,12 +31,13 @@
 				:extraValue="chargedSoc"
 				align="start"
 			/>
-			<TargetCharge
-				class="flex-grow-1 text-center target-charge"
-				v-bind="targetCharge"
-				:disabled="targetChargeDisabled"
+			<ChargingPlan
+				class="flex-grow-1 target-charge"
+				v-bind="chargingPlan"
+				:disabled="chargingPlanDisabled"
 				@target-time-updated="setTargetTime"
 				@target-time-removed="removeTargetTime"
+				@minsoc-updated="setMinSoc"
 			/>
 			<TargetSocSelect
 				v-if="socBasedCharging"
@@ -54,9 +56,6 @@
 				@target-energy-updated="targetEnergyUpdated"
 			/>
 		</div>
-		<div v-if="$hiddenFeatures" class="d-flex justify-content-start">
-			<small>vor 5 Stunden</small>
-		</div>
 	</div>
 </template>
 
@@ -67,7 +66,7 @@ import LabelAndValue from "./LabelAndValue.vue";
 import VehicleTitle from "./VehicleTitle.vue";
 import VehicleSoc from "./VehicleSoc.vue";
 import VehicleStatus from "./VehicleStatus.vue";
-import TargetCharge from "./TargetCharge.vue";
+import ChargingPlan from "./ChargingPlan.vue";
 import TargetSocSelect from "./TargetSocSelect.vue";
 import TargetEnergySelect from "./TargetEnergySelect.vue";
 import { distanceUnit, distanceValue } from "../units";
@@ -79,7 +78,7 @@ export default {
 		VehicleSoc,
 		VehicleStatus,
 		LabelAndValue,
-		TargetCharge,
+		ChargingPlan,
 		TargetSocSelect,
 		TargetEnergySelect,
 	},
@@ -87,6 +86,7 @@ export default {
 	props: {
 		id: [String, Number],
 		connected: Boolean,
+		integratedDevice: Boolean,
 		vehiclePresent: Boolean,
 		vehicleSoc: Number,
 		vehicleTargetSoc: Number,
@@ -110,8 +110,15 @@ export default {
 		phaseRemainingInterpolated: Number,
 		pvAction: String,
 		pvRemainingInterpolated: Number,
-		parked: Boolean,
+		guardAction: String,
+		guardRemainingInterpolated: Number,
 		vehicles: Array,
+		climaterActive: Boolean,
+		smartCostLimit: Number,
+		smartCostType: String,
+		tariffGrid: Number,
+		tariffCo2: Number,
+		currency: String,
 	},
 	emits: [
 		"target-time-removed",
@@ -120,6 +127,7 @@ export default {
 		"target-energy-updated",
 		"change-vehicle",
 		"remove-vehicle",
+		"minsoc-updated",
 	],
 	data() {
 		return {
@@ -136,8 +144,8 @@ export default {
 		vehicleTitleProps: function () {
 			return this.collectProps(VehicleTitle);
 		},
-		targetCharge: function () {
-			return this.collectProps(TargetCharge);
+		chargingPlan: function () {
+			return this.collectProps(ChargingPlan);
 		},
 		range: function () {
 			return distanceValue(this.vehicleRange);
@@ -161,7 +169,7 @@ export default {
 			const value = this.socPerKwh * (this.chargedEnergy / 1e3);
 			return value > 1 ? `+${Math.round(value)}%` : null;
 		},
-		targetChargeDisabled: function () {
+		chargingPlanDisabled: function () {
 			if (!this.connected) {
 				return true;
 			}
@@ -198,6 +206,9 @@ export default {
 		},
 		setTargetTime: function (targetTime) {
 			this.$emit("target-time-updated", targetTime);
+		},
+		setMinSoc: function (minSoc) {
+			this.$emit("minsoc-updated", minSoc);
 		},
 		removeTargetTime: function () {
 			this.$emit("target-time-removed");

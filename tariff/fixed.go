@@ -12,9 +12,10 @@ import (
 )
 
 type Fixed struct {
-	unit  string
-	clock clock.Clock
-	zones fixed.Zones
+	unit    string
+	clock   clock.Clock
+	zones   fixed.Zones
+	dynamic bool
 }
 
 var _ api.Tariff = (*Fixed)(nil)
@@ -25,7 +26,7 @@ func init() {
 
 func NewFixedFromConfig(other map[string]interface{}) (api.Tariff, error) {
 	var cc struct {
-		Currency string
+		Currency string // TODO deprecated
 		Price    float64
 		Zones    []struct {
 			Price       float64
@@ -37,16 +38,10 @@ func NewFixedFromConfig(other map[string]interface{}) (api.Tariff, error) {
 		return nil, err
 	}
 
-	if cc.Currency == "" {
-		cc.Currency = "EUR"
-	}
-
 	t := &Fixed{
-		unit:  cc.Currency,
-		clock: clock.New(),
-		zones: []fixed.Zone{
-			{Price: cc.Price}, // full week is implicit
-		},
+		unit:    cc.Currency,
+		clock:   clock.New(),
+		dynamic: len(cc.Zones) > 1,
 	}
 
 	for _, z := range cc.Zones {
@@ -79,12 +74,12 @@ func NewFixedFromConfig(other map[string]interface{}) (api.Tariff, error) {
 
 	sort.Sort(t.zones)
 
-	return t, nil
-}
+	// prepend catch-all zone
+	t.zones = append([]fixed.Zone{
+		{Price: cc.Price}, // full week is implicit
+	}, t.zones...)
 
-// Unit implements the api.Tariff interface
-func (t *Fixed) Unit() string {
-	return t.unit
+	return t, nil
 }
 
 // Rates implements the api.Tariff interface
@@ -135,4 +130,12 @@ func (t *Fixed) Rates() (api.Rates, error) {
 	}
 
 	return res, nil
+}
+
+// Type returns the tariff type
+func (t *Fixed) Type() api.TariffType {
+	if t.dynamic {
+		return api.TariffTypePriceDynamic
+	}
+	return api.TariffTypePriceStatic
 }

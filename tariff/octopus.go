@@ -2,13 +2,14 @@ package tariff
 
 import (
 	"errors"
-	"github.com/evcc-io/evcc/tariff/octopus"
 	"sync"
 	"time"
 
 	"github.com/evcc-io/evcc/api"
+	"github.com/evcc-io/evcc/tariff/octopus"
 	"github.com/evcc-io/evcc/util"
 	"github.com/evcc-io/evcc/util/request"
+	"golang.org/x/exp/slices"
 )
 
 type Octopus struct {
@@ -60,7 +61,7 @@ func (t *Octopus) run(done chan error) {
 	var once sync.Once
 	client := request.NewHelper(t.log)
 
-	for ; true; <-time.NewTicker(time.Hour).C {
+	for ; true; <-time.Tick(time.Hour) {
 		var res octopus.UnitRates
 		if err := client.GetJSON(t.uri, &res); err != nil {
 			once.Do(func() { done <- err })
@@ -99,5 +100,10 @@ func (t *Octopus) Unit() string {
 func (t *Octopus) Rates() (api.Rates, error) {
 	t.mux.Lock()
 	defer t.mux.Unlock()
-	return append([]api.Rate{}, t.data...), outdatedError(t.updated, time.Hour)
+	return slices.Clone(t.data), outdatedError(t.updated, time.Hour)
+}
+
+// Type returns the tariff type
+func (t *Octopus) Type() api.TariffType {
+	return api.TariffTypePriceDynamic
 }

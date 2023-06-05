@@ -90,6 +90,9 @@ var _ api.VehicleRange = (*Provider)(nil)
 // Range implements the api.VehicleRange interface
 func (v *Provider) Range() (int64, error) {
 	res, err := v.statusG()
+	if err == nil && res.FuelStatus == nil {
+		err = api.ErrNotAvailable
+	}
 
 	var eng EngineRangeStatus
 	if err == nil {
@@ -109,7 +112,7 @@ var _ api.VehicleOdometer = (*Provider)(nil)
 func (v *Provider) Odometer() (float64, error) {
 	res, err := v.statusG()
 	if err == nil && res.Measurements == nil {
-		err = errors.New("missing measurements")
+		err = api.ErrNotAvailable
 	}
 
 	if err == nil {
@@ -122,30 +125,23 @@ func (v *Provider) Odometer() (float64, error) {
 var _ api.VehicleClimater = (*Provider)(nil)
 
 // Climater implements the api.VehicleClimater interface
-func (v *Provider) Climater() (active bool, outsideTemp, targetTemp float64, err error) {
+func (v *Provider) Climater() (bool, error) {
 	res, err := v.statusG()
 	if err == nil && res.Climatisation == nil {
-		err = errors.New("missing climatisation status")
+		err = api.ErrNotAvailable
 	}
 
 	if err == nil {
 		state := strings.ToLower(res.Climatisation.ClimatisationStatus.Value.ClimatisationState)
-
 		if state == "" {
-			return false, 0, 0, api.ErrNotAvailable
+			return false, api.ErrNotAvailable
 		}
 
 		active := state != "off" && state != "invalid" && state != "error"
-
-		targetTemp = res.Climatisation.ClimatisationSettings.Value.TargetTemperatureC
-
-		// TODO not available; use target temp to avoid wrong heating/cooling display
-		outsideTemp = targetTemp
-
-		return active, outsideTemp, targetTemp, nil
+		return active, nil
 	}
 
-	return active, outsideTemp, targetTemp, err
+	return false, err
 }
 
 var _ api.SocLimiter = (*Provider)(nil)

@@ -14,14 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
-          go-version: ^1.18
-          cache: true
+          go-version: ^1.20
         id: go
 
       - name: Build docs
-        run: make docs
+        run: make install docs
 
       - name: Deploy to docs repo
         uses: peaceiris/actions-gh-pages@v3

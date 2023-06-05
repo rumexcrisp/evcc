@@ -28,6 +28,9 @@ func (lp *Loadpoint) setPhases(phases int) {
 		lp.phases = phases
 		lp.Unlock()
 
+		// publish updated phase configuration
+		lp.publish(phasesEnabled, lp.phases)
+
 		// reset timer to disabled state
 		lp.resetPhaseTimer()
 
@@ -103,17 +106,14 @@ func (lp *Loadpoint) maxActivePhases() int {
 	// if 1p3p supported then assume configured limit or 3p
 	if _, ok := lp.charger.(api.PhaseSwitcher); ok {
 		physical = lp.ConfiguredPhases
-		if physical == 0 {
-			physical = 3
-		}
 	}
 
 	return min(expect(vehicle), expect(physical), expect(measured))
 }
 
 func (lp *Loadpoint) getVehiclePhases() int {
-	if lp.vehicle != nil {
-		return lp.vehicle.Phases()
+	if vehicle := lp.GetVehicle(); vehicle != nil {
+		return vehicle.Phases()
 	}
 
 	return 0

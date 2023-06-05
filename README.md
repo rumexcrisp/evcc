@@ -15,7 +15,7 @@ evcc is an extensible EV Charge Controller with PV integration implemented in [G
 
 - simple and clean user interface
 - wide range of supported [chargers](https://docs.evcc.io/docs/devices/chargers):
-  - ABL eMH1, Alfen (Eve), Bender (CC612/613), cFos (PowerBrain), Daheimladen, Ebee (Wallbox), Ensto (Chago Wallbox), [EVSEWifi/ smartWB](https://www.evse-wifi.de), Garo (GLB, GLB+, LS4), go-eCharger, HardyBarth (eCB1, cPH1, cPH2), Heidelberg (Energy Control), Innogy (eBox), Juice (Charger Me), KEBA/BMW, Menneckes (Amedio, Amtron Premium/Xtra, Amtron ChargeConrol), NRGkick, [openWB (includes Pro)](https://openwb.de/), Optec (Mobility One), PC Electric (includes Garo), TechniSat (Technivolt), [Tinkerforge Warp Charger](https://www.warp-charger.com), Ubitricity (Heinz), Vestel, Wallbe, Webasto (Live), Mobile Charger Connect and many more
+  - ABL eMH1, Alfen (Eve), Bender (CC612/613), cFos (PowerBrain), Daheimladen, Ebee (Wallbox), Ensto (Chago Wallbox), [EVSEWifi/ smartWB](https://www.evse-wifi.de), Garo (GLB, GLB+, LS4), go-eCharger, HardyBarth (eCB1, cPH1, cPH2), Heidelberg (Energy Control), Innogy (eBox), Juice (Charger Me), KEBA/BMW, Menneckes (Amedio, Amtron Premium/Xtra, Amtron ChargeConrol), NRGkick, [openWB (includes Pro)](https://openwb.de/), Optec (Mobility One), PC Electric (includes Garo), Siemens, TechniSat (Technivolt), [Tinkerforge Warp Charger](https://www.warp-charger.com), Ubitricity (Heinz), Vestel, Wallbe, Webasto (Live), Mobile Charger Connect and many more
   - experimental EEBus support (Elli, PMCC)
   - experimental OCPP support
   - Build-your-own: Phoenix Contact (includes ESL Walli), [EVSE DIN](http://evracing.cz/simple-evse-wallbox)
@@ -43,11 +43,13 @@ You'll find everything you need in our [documentation](https://docs.evcc.io/) (G
 
 ## Contribute
 
-To build evcc from source, [Go][1] 1.18 and [Node][2] 18 are required.
+To build evcc from source, [Go][1] 1.20 and [Node][2] 18 are required.
 
 Build and run go backend. The UI becomes available at http://127.0.0.1:7070/
 
 ```sh
+make ui
+make install
 make
 ./evcc
 ```
@@ -66,14 +68,6 @@ We use linters (golangci-lint, Prettier) to keep a coherent source code formatti
 ```sh
 make lint
 make lint-ui
-```
-
-### Changing UI code
-
-To ensure reproducability the build frontend artifacts are part of the source code repository. If you've made changes to frontend code, please make sure to rebuild the production assets before you commit.
-
-```sh
-make ui
 ```
 
 ### Changing templates

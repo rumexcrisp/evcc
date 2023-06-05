@@ -4,18 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
-	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
+	"github.com/evcc-io/evcc/api"
 	"github.com/evcc-io/evcc/util"
-)
-
-const (
-	connectTimeout = 2 * time.Second
-	publishTimeout = 2 * time.Second
+	"github.com/evcc-io/evcc/util/request"
 )
 
 // Instance is the paho Mqtt client singleton
@@ -52,10 +47,10 @@ const secure = "tls://"
 
 // NewClient creates new Mqtt publisher
 func NewClient(log *util.Logger, broker, user, password, clientID string, qos byte, insecure bool, opts ...Option) (*Client, error) {
-	isSecure := strings.HasPrefix(broker, secure)
+	broker, isSecure := strings.CutPrefix(broker, secure)
 
 	// strip schema as it breaks net.SplitHostPort
-	broker = util.DefaultPort(strings.TrimPrefix(broker, secure), 1883)
+	broker = util.DefaultPort(broker, 1883)
 	if isSecure {
 		broker = secure + broker
 	}
@@ -75,7 +70,7 @@ func NewClient(log *util.Logger, broker, user, password, clientID string, qos by
 	options.SetAutoReconnect(true)
 	options.SetOnConnectHandler(mc.ConnectionHandler)
 	options.SetConnectionLostHandler(mc.ConnectionLostHandler)
-	options.SetConnectTimeout(connectTimeout)
+	options.SetConnectTimeout(request.Timeout)
 
 	if insecure {
 		options.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
@@ -126,10 +121,8 @@ func (m *Client) ConnectionHandler(client paho.Client) {
 func (m *Client) Publish(topic string, retained bool, payload interface{}) error {
 	m.log.TRACE.Printf("send %s: '%v'", topic, payload)
 	token := m.Client.Publish(topic, m.Qos, retained, payload)
-	if token.WaitTimeout(publishTimeout) {
-		return token.Error()
-	}
-	return os.ErrDeadlineExceeded
+	go m.WaitForToken("send", topic, token)
+	return nil
 }
 
 // Listen validates uniqueness and registers and attaches listener
@@ -142,11 +135,13 @@ func (m *Client) Listen(topic string, callback func(string)) {
 }
 
 // ListenSetter creates a /set listener that resets the payload after handling
-func (m *Client) ListenSetter(topic string, callback func(string)) {
+func (m *Client) ListenSetter(topic string, callback func(string) error) {
 	m.Listen(topic, func(payload string) {
-		callback(payload)
+		if err := callback(payload); err != nil {
+			m.log.ERROR.Printf("set %s: %v", strings.TrimSuffix(topic, "/set"), err)
+		}
 		if err := m.Publish(topic, true, ""); err != nil {
-			m.log.ERROR.Printf("clear: %v", err)
+			m.log.ERROR.Printf("clear: %s: %v", topic, err)
 		}
 	})
 }
@@ -166,16 +161,16 @@ func (m *Client) listen(topic string) {
 			}
 		}
 	})
-	m.WaitForToken(token)
+	go m.WaitForToken("subscribe", topic, token)
 }
 
 // WaitForToken synchronously waits until token operation completed
-func (m *Client) WaitForToken(token paho.Token) {
-	if token.WaitTimeout(publishTimeout) {
-		if token.Error() != nil {
-			m.log.ERROR.Printf("error: %s", token.Error())
-		}
-	} else {
-		m.log.DEBUG.Println("timeout")
+func (m *Client) WaitForToken(action, topic string, token paho.Token) {
+	err := api.ErrTimeout
+	if token.WaitTimeout(request.Timeout) {
+		err = token.Error()
+	}
+	if err != nil {
+		m.log.ERROR.Printf("%s: %s: %v", action, topic, err)
 	}
 }

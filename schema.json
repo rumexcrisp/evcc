@@ -154,10 +154,19 @@
               "type": "string"
             },
             "pv": {
-              "type": "string"
+              "description": "PV inverter/meter (1 or more)",
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "uniqueItems": true
             },
             "pvs": {
-              "description": "List of pv inverters/meters",
+              "description": "PV inverters/meters",
               "type": "array",
               "items": {
                 "type": "string"
@@ -166,21 +175,49 @@
               "uniqueItems": true
             },
             "battery": {
-              "type": "string"
+              "description": "Home battery (1 or more)",
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "uniqueItems": true
             },
             "batteries": {
-              "description": "List of home batteries",
+              "description": "Home batteries",
               "type": "array",
               "items": {
                 "type": "string"
               },
               "minItems": 1,
               "uniqueItems": true
+            },
+            "smart": {
+              "type": "string"
             }
           }
         },
-        "prioritySoc": {},
-        "bufferSoc": {}
+        "residualPower": {
+          "type": "number"
+        },
+        "prioritySoc": {
+          "type": "number"
+        },
+        "bufferSoc": {
+          "type": "number"
+        },
+        "bufferStartSoc": {
+          "type": "number"
+        },
+        "maxGridSupplyWhileBatteryCharging": {
+          "type": "number"
+        },
+        "autoChargeCostLimit": {
+          "type": "number"
+        }
       }
     },
     "loadpoints": {
@@ -207,6 +244,18 @@
           "meter": {
             "type": "string"
           },
+          "minCurrent": {
+            "type": "integer"
+          },
+          "maxCurrent": {
+            "type": "integer"
+          },
+          "phases": {
+            "type": "integer"
+          },
+          "priority": {
+            "type": "integer"
+          },
           "vehicle": {
             "type": "string"
           },
@@ -228,15 +277,6 @@
                 "type": "boolean"
               }
             }
-          },
-          "phases": {
-            "type": "integer"
-          },
-          "minCurrent": {
-            "type": "integer"
-          },
-          "maxCurrent": {
-            "type": "integer"
           },
           "guardDuration": {
             "$ref": "#/definitions/duration"
